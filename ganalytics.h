@@ -4,6 +4,8 @@
 #include <QObject>
 #include <QNetworkAccessManager>
 #include <QCoreApplication>
+#include <QUrl>
+#include <QQueue>
 
 class GAnalytics : public QObject
 {
@@ -13,6 +15,8 @@ public:
 
 private:
     QNetworkAccessManager networkManager;
+    QQueue<QUrl> messageQueue;
+    QString baseUrl;
     QString trackingID;
     QString clientID;
     QString userID;
@@ -24,7 +28,7 @@ private:
 signals:
 
 public slots:
-    void sendAppview(QString appName, QString appVersion = "", QString screenName = "") const;
+    void sendAppview(QString appName, QString appVersion = "", QString screenName = "");
 
 };
 
