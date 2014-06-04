@@ -33,6 +33,9 @@ signals:
 
 public slots:
     void sendAppview(QString appName, QString appVersion = "", QString screenName = "");
+    void sendEvent(QString eventCategory = "", QString eventAction = "", QString eventLabel = "", int eventValue = 0);
+    void sendException(QString exceptionDescription, bool exceptionFatal = true);
+    void endSession();
     void postMessage();
     void postMessageFinished(QNetworkReply *replay);
 
