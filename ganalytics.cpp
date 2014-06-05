@@ -15,6 +15,8 @@ GAnalytics::GAnalytics(QCoreApplication *parent, QString trackingID, QString cli
     timer(this),
     networkManager(this)
 {
+    appName = parent->applicationName();
+    appVersion = parent->applicationVersion();
     connect(&timer, SIGNAL(timeout()), this, SLOT(postMessage()));
     timer.start(30000);
     connect(&networkManager, SIGNAL(finished(QNetworkReply*)), this, SLOT(postMessageFinished(QNetworkReply*)));
