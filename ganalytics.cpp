@@ -116,6 +116,8 @@ void GAnalytics::endSession()
  * The function tries to send a messages from the queue.
  * If message was successfully send then this function
  * will be called back to send next message.
+ * If message queue contains more than one message then
+ * the connection will kept open.
  * The message POST is asyncroniously when the server
  * answered a signal will be emitted.
  */
@@ -125,8 +127,14 @@ void GAnalytics::postMessage()
     {
         return;
     }
+    QString connection = "close";
+    if (messageQueue.count() > 1)
+    {
+        connection = "keep-alive";
+    }
     QUrlQuery param = messageQueue.head();
-    //requestUrl.setHeader(QNetworkRequest::ContentLengthHeader, param.toString().length());
+    request.setRawHeader("Connection", connection.toUtf8());
+    request.setHeader(QNetworkRequest::ContentLengthHeader, param.toString().length());
     networkManager.post(request, param.query(QUrl::EncodeUnicode).toUtf8());
 }
 
