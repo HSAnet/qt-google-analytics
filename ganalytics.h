@@ -14,7 +14,7 @@ class GAnalytics : public QObject
 {
     Q_OBJECT
 public:
-    explicit GAnalytics(QCoreApplication *parent, QString trackingID, QString clientID = "");
+    explicit GAnalytics(QCoreApplication *parent, QString trackingID, QString clientID = QString());
 
 private:
     QNetworkAccessManager networkManager;
@@ -30,14 +30,21 @@ private:
     QString appVersion;
 
 signals:
+    void postNextMessage();
 
 public slots:
-    void sendAppview(QString appName, QString appVersion = "", QString screenName = "");
-    void sendEvent(QString eventCategory = "", QString eventAction = "", QString eventLabel = "", int eventValue = 0);
-    void sendException(QString exceptionDescription, bool exceptionFatal = true);
+    void sendAppview(const QString screenName = QString());
+    void sendEvent(const QString eventCategory = QString(),
+                   const QString eventAction = QString(),
+                   const QString eventLabel = QString(),
+                   const QVariant eventValue = QVariant());
+    void sendException(const QString exceptionDescription, const bool exceptionFatal = true);
     void endSession();
     void postMessage();
     void postMessageFinished(QNetworkReply *replay);
+
+private:
+    QString getUserAgent();
 
 };
 

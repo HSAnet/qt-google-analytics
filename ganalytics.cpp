@@ -7,7 +7,7 @@
  * @param clientID
  * @param withGet       Determines wheather the messages are send with GET or POST.
  */
-GAnalytics::GAnalytics(QCoreApplication *parent, QString trackingID, QString clientID) :
+GAnalytics::GAnalytics(const QCoreApplication *parent, const QString trackingID, const QString clientID) :
     QObject(parent),
     trackingID(trackingID),
     clientID(clientID),
@@ -15,11 +15,14 @@ GAnalytics::GAnalytics(QCoreApplication *parent, QString trackingID, QString cli
     timer(this),
     networkManager(this)
 {
-    appName = parent->applicationName();
+    requestUrl.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+    appName = qApp->applicationName();
     appVersion = parent->applicationVersion();
-    connect(&timer, SIGNAL(timeout()), this, SLOT(postMessage()));
-    timer.start(30000);
+    userAgent = "User-Agent: Mozilla/5.0 (iPad; U; CPU OS 3_2_1 like Mac OS X; en-us) AppleWebKit/531.21.10 (KHTML, like Gecko) Mobile/7B405";
     connect(&networkManager, SIGNAL(finished(QNetworkReply*)), this, SLOT(postMessageFinished(QNetworkReply*)));
+    connect(this, SIGNAL(postNextMessage()), this, SLOT(postMessage()));
+    timer.start(30000);
+    connect(&timer, SIGNAL(timeout()), this, SLOT(postMessage()));
 }
 
 /**
@@ -31,7 +34,7 @@ GAnalytics::GAnalytics(QCoreApplication *parent, QString trackingID, QString cli
  * @param appVersion
  * @param screenName
  */
-void GAnalytics::sendAppview(QString appName, QString appVersion, QString screenName)
+void GAnalytics::sendAppview(const QString screenName)
 {
     QUrlQuery query;
     query.addQueryItem("v", "1");
@@ -43,14 +46,9 @@ void GAnalytics::sendAppview(QString appName, QString appVersion, QString screen
     if (! userIPAddress.isEmpty())
         query.addQueryItem("uip", userIPAddress);
     // Didn't implement: screenResolution, viewPortSize, userLanguage, screenName
-    if (! this->appName.isEmpty())
-        query.addQueryItem("an", this->appName);
-    else if (! appName.isEmpty())
-        query.addQueryItem("an", appName);
-    if (! this->appVersion.isEmpty())
-        query.addQueryItem("av", this->appVersion);
-    else if (! appVersion.isEmpty())
-        query.addQueryItem("av", appVersion);
+    query.addQueryItem("an", this->appName);
+    query.addQueryItem("av", this->appVersion);
+
     messageQueue.enqueue(query);
 }
 
@@ -63,7 +61,7 @@ void GAnalytics::sendAppview(QString appName, QString appVersion, QString screen
  * @param eventLabel
  * @param eventValue
  */
-void GAnalytics::sendEvent(QString eventCategory, QString eventAction, QString eventLabel, int eventValue)
+void GAnalytics::sendEvent(const QString eventCategory, const QString eventAction, const QString eventLabel, const QVariant eventValue)
 {
     QUrlQuery query;
     query.addQueryItem("v", "1");
@@ -80,8 +78,8 @@ void GAnalytics::sendEvent(QString eventCategory, QString eventAction, QString e
         query.addQueryItem("ea", eventAction);
     if (! eventLabel.isEmpty())
         query.addQueryItem("el", eventLabel);
-    if (eventValue != 0)
-        query.addQueryItem("ev", QString::number(eventValue));
+    if (eventValue.isValid())
+        query.addQueryItem("ev", eventValue.toString());
 
     messageQueue.enqueue(query);
 }
@@ -93,7 +91,7 @@ void GAnalytics::sendEvent(QString eventCategory, QString eventAction, QString e
  * @param exceptionDescription
  * @param exceptionFatal
  */
-void GAnalytics::sendException(QString exceptionDescription, bool exceptionFatal)
+void GAnalytics::sendException(const QString exceptionDescription, const bool exceptionFatal)
 {
     QUrlQuery query;
     query.addQueryItem("v", "1");
@@ -137,12 +135,17 @@ void GAnalytics::endSession()
  */
 void GAnalytics::postMessage()
 {
+    printf("Try to send ...");      // just to test
     if (messageQueue.isEmpty())
     {
+        printf(" nothing to send.\n");  // just to test
         return;
     }
+    printf("\n");                       // just to test
     QUrlQuery param = messageQueue.head();
-    networkManager.post(requestUrl, param.query().toUtf8());
+    requestUrl.setHeader(QNetworkRequest::UserAgentHeader, userAgent);
+    //requestUrl.setHeader(QNetworkRequest::ContentLengthHeader, param.toString().length());
+    networkManager.post(requestUrl, param.query(QUrl::EncodeUnicode).toUtf8());
 }
 
 /**
@@ -160,10 +163,24 @@ void GAnalytics::postMessageFinished(QNetworkReply *replay)
     int httpStausCode = replay->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (httpStausCode < 200 || httpStausCode > 299)
     {
+        printf("Error : %i\n", httpStausCode);              // just for testing
         // An error is occured. Is logging requiered ????
         return;
     }
     QUrlQuery remove = messageQueue.dequeue();
-    emit postMessage();
+    printf("Send status : OK.\n");                          // just for testing
+    emit postNextMessage();
     replay->deleteLater();
+}
+
+/**
+ * Try to gain information about the system where this application
+ * is running. It needs to get the name and version of the operating
+ * system, the language and screen resolution.
+ * All this information will be send in POST messages.
+ * @return agent        A QString with all the information formatted for a POST message.
+ */
+QString GAnalytics::getUserAgent()
+{
+    QSysInfo::MacVersion macVersion = QSysInfo::macVersion();
 }
