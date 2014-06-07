@@ -336,7 +336,18 @@ QString GAnalytics::getSystemInfo()
 }
 #endif
 
-/*
 #ifdef Q_OS_LINUX
+#include <sys/utsname.h>
+
+/**
+ * Only on Unix systems.
+ * Get operation system name and version.
+ * @return os       A QString with the name and version of the operating system.
+ */
+QString GAnalytics::getSystemInfo()
+{
+    struct utsname buf;
+    uname(&buf);
+}
 #endif
-*/
+
