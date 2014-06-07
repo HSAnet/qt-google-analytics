@@ -9,25 +9,26 @@
 #include <QUrlQuery>
 #include <QQueue>
 #include <QTimer>
+#include <QApplication>
+#include <QDesktopWidget>
 
 class GAnalytics : public QObject
 {
     Q_OBJECT
 public:
-    explicit GAnalytics(QCoreApplication *parent, QString trackingID, QString clientID = QString());
+    explicit GAnalytics(QCoreApplication *parent, const QString trackingID, const QString clientID);
 
 private:
     QNetworkAccessManager networkManager;
     QQueue<QUrlQuery> messageQueue;
     QTimer timer;
-    QNetworkRequest requestUrl;
+    QNetworkRequest request;
     QString trackingID;
     QString clientID;
-    QString userID;
-    QString userIPAddress;
-    QString userAgent;
     QString appName;
     QString appVersion;
+    QString language;
+    QString screenResolution;
 
 signals:
     void postNextMessage();
@@ -44,7 +45,10 @@ public slots:
     void postMessageFinished(QNetworkReply *replay);
 
 private:
+    QUrlQuery buildStandardPostQuery(const QString type);
+    QString getScreenResolution();
     QString getUserAgent();
+    QString getSystemInfo();
 
 };
 

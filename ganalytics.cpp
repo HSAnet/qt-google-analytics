@@ -7,22 +7,24 @@
  * @param clientID
  * @param withGet       Determines wheather the messages are send with GET or POST.
  */
-GAnalytics::GAnalytics(const QCoreApplication *parent, const QString trackingID, const QString clientID) :
+GAnalytics::GAnalytics(QCoreApplication *parent, const QString trackingID, const QString clientID) :
     QObject(parent),
     trackingID(trackingID),
     clientID(clientID),
-    requestUrl(QUrl("http://www.google-analytics.com/collect")),
+    request(QUrl("http://www.google-analytics.com/collect")),
     timer(this),
     networkManager(this)
 {
-    requestUrl.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+    request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
     appName = qApp->applicationName();
     appVersion = parent->applicationVersion();
-    userAgent = "User-Agent: Mozilla/5.0 (iPad; U; CPU OS 3_2_1 like Mac OS X; en-us) AppleWebKit/531.21.10 (KHTML, like Gecko) Mobile/7B405";
     connect(&networkManager, SIGNAL(finished(QNetworkReply*)), this, SLOT(postMessageFinished(QNetworkReply*)));
     connect(this, SIGNAL(postNextMessage()), this, SLOT(postMessage()));
     timer.start(30000);
     connect(&timer, SIGNAL(timeout()), this, SLOT(postMessage()));
+    language = QLocale::system().nativeLanguageName();
+    //screenResolution = getScreenResolution();
 }
 
 /**
@@ -36,16 +38,11 @@ GAnalytics::GAnalytics(const QCoreApplication *parent, const QString trackingID,
  */
 void GAnalytics::sendAppview(const QString screenName)
 {
-    QUrlQuery query;
-    query.addQueryItem("v", "1");
-    query.addQueryItem("tid", trackingID);
-    query.addQueryItem("cid", clientID);
-    query.addQueryItem("t", "appview");
-    if (! userID.isEmpty())
-        query.addQueryItem("uid", userID);
-    if (! userIPAddress.isEmpty())
-        query.addQueryItem("uip", userIPAddress);
-    // Didn't implement: screenResolution, viewPortSize, userLanguage, screenName
+    QUrlQuery query = buildStandardPostQuery("appview");
+    if (! screenName.isEmpty())
+    {
+        query.addQueryItem("cd", screenName);
+    }
     query.addQueryItem("an", this->appName);
     query.addQueryItem("av", this->appVersion);
 
@@ -63,15 +60,9 @@ void GAnalytics::sendAppview(const QString screenName)
  */
 void GAnalytics::sendEvent(const QString eventCategory, const QString eventAction, const QString eventLabel, const QVariant eventValue)
 {
-    QUrlQuery query;
-    query.addQueryItem("v", "1");
-    query.addQueryItem("tid", trackingID);
-    query.addQueryItem("cid", clientID);
-    query.addQueryItem("t", "event");
-    if (! appName.isEmpty())
-        query.addQueryItem("an", appName);
-    if (! appVersion.isEmpty())
-        query.addQueryItem("av", appVersion);
+    QUrlQuery query = buildStandardPostQuery("event");
+    query.addQueryItem("an", appName);
+    query.addQueryItem("av", appVersion);
     if (! eventCategory.isEmpty())
         query.addQueryItem("ec", eventCategory);
     if (! eventAction.isEmpty())
@@ -93,17 +84,16 @@ void GAnalytics::sendEvent(const QString eventCategory, const QString eventActio
  */
 void GAnalytics::sendException(const QString exceptionDescription, const bool exceptionFatal)
 {
-    QUrlQuery query;
-    query.addQueryItem("v", "1");
-    query.addQueryItem("tid", trackingID);
-    query.addQueryItem("cid", clientID);
-    query.addQueryItem("t", "exception");
-    if (! exceptionDescription.isEmpty())
-        query.addQueryItem("exd", exceptionDescription);
+    QUrlQuery query = buildStandardPostQuery("exception");
+    query.addQueryItem("exd", exceptionDescription);
     if (exceptionFatal)
+    {
         query.addQueryItem("exf", "1");
+    }
     else
+    {
         query.addQueryItem("exf", "0");
+    }
 
     messageQueue.enqueue(query);
 }
@@ -115,37 +105,29 @@ void GAnalytics::sendException(const QString exceptionDescription, const bool ex
  */
 void GAnalytics::endSession()
 {
-    QUrlQuery query;
-    query.addQueryItem("v", "1");
-    query.addQueryItem("tid", trackingID);
-    query.addQueryItem("t", "event");
+    QUrlQuery query = buildStandardPostQuery("event");
     query.addQueryItem("sc", "end");
 
     messageQueue.enqueue(query);
 }
 
 /**
- * This function is called by a timer every 30 seconds.
- * Its the time intervall to send messages. Function
- * tries to send a messages from the queue. It will be
- * called back if successfully send the message and there
- * are still any message in the queue.
- * The message POST is asyncroniously when ready it sends
- * a signal.
+ * This function is called by a timer interval.
+ * The function tries to send a messages from the queue.
+ * If message was successfully send then this function
+ * will be called back to send next message.
+ * The message POST is asyncroniously when the server
+ * answered a signal will be emitted.
  */
 void GAnalytics::postMessage()
 {
-    printf("Try to send ...");      // just to test
     if (messageQueue.isEmpty())
     {
-        printf(" nothing to send.\n");  // just to test
         return;
     }
-    printf("\n");                       // just to test
     QUrlQuery param = messageQueue.head();
-    requestUrl.setHeader(QNetworkRequest::UserAgentHeader, userAgent);
     //requestUrl.setHeader(QNetworkRequest::ContentLengthHeader, param.toString().length());
-    networkManager.post(requestUrl, param.query(QUrl::EncodeUnicode).toUtf8());
+    networkManager.post(request, param.query(QUrl::EncodeUnicode).toUtf8());
 }
 
 /**
@@ -174,6 +156,39 @@ void GAnalytics::postMessageFinished(QNetworkReply *replay)
 }
 
 /**
+ * Build the POST query. Adds all parameter to the query
+ * which are used in every POST.
+ * @param type      Type of POST message. The event which is to post.
+ * @return query    Most used parameter in a query for a POST.
+ */
+QUrlQuery GAnalytics::buildStandardPostQuery(const QString type)
+{
+    QUrlQuery query;
+    query.addQueryItem("v", "1");
+    query.addQueryItem("tid", trackingID);
+    query.addQueryItem("cid", clientID);
+    query.addQueryItem("t", type);
+    // Didn't implement: viewPortSize, userID, userIPAddress
+    query.addQueryItem("sr", screenResolution);
+    query.addQueryItem("ul", language);
+
+    return query;
+}
+
+/**
+ * Get used screen resolution.
+ * @return      A QString like "800x600".
+ */
+QString GAnalytics::getScreenResolution()
+{
+    QDesktopWidget *desktop = QApplication::desktop();
+    int width = desktop->width();
+    int heigth = desktop->height();
+
+    return QString::number(width) + "x" + QString::number(heigth);
+}
+
+/**
  * Try to gain information about the system where this application
  * is running. It needs to get the name and version of the operating
  * system, the language and screen resolution.
@@ -182,5 +197,91 @@ void GAnalytics::postMessageFinished(QNetworkReply *replay)
  */
 QString GAnalytics::getUserAgent()
 {
-    QSysInfo::MacVersion macVersion = QSysInfo::macVersion();
+    QString locale = QLocale::system().name();
+    QString system = getSystemInfo();
+
+    return "Mozilla/5.0 (" + system + "; " + locale + ") GAnalytics/1.0 (Qt/" QT_VERSION_STR ")";
 }
+
+#ifdef Q_OS_MAC
+/**
+ * Only on Mac OS X
+ * Get the Operating system name and version.
+ * @return os   The operating system name and version in a string.
+ */
+QString GAnalytics::getSystemInfo()
+{
+    QSysInfo::MacVersion version = QSysInfo::macVersion();
+    QString os;
+    switch (version) {
+    case QSysInfo::MV_9:
+        os = "Macintosh; Mac OS 9";
+        break;
+    case QSysInfo::MV_10_0:
+        os = "Macintosh; Mac OS 10.0";
+        break;
+    case QSysInfo::MV_10_1:
+        os = "Macintosh; Mac OS 10.1";
+        break;
+    case QSysInfo::MV_10_2:
+        os = "Macintosh; Mac OS 10.2";
+        break;
+    case QSysInfo::MV_10_3:
+        os = "Macintosh; Mac OS 10.3";
+        break;
+    case QSysInfo::MV_10_4:
+        os = "Macintosh; Mac OS 10.4";
+        break;
+    case QSysInfo::MV_10_5:
+        os = "Macintosh; Mac OS 10.5";
+        break;
+    case QSysInfo::MV_10_6:
+        os = "Macintosh; Mac OS 10.6";
+        break;
+    case QSysInfo::MV_10_7:
+        os = "Macintosh; Mac OS 10.7";
+        break;
+    case QSysInfo::MV_10_8:
+        os = "Macintosh; Mac OS 10.8";
+        break;
+    case QSysInfo::MV_10_9:
+        os = "Macintosh; Mac OS 10.9";
+        break;
+    case QSysInfo::MV_Unknown:
+        os = "Macintosh; Mac OS unknown";
+        break;
+    case QSysInfo::MV_IOS_5_0:
+        os = "iPhone; iOS 5.0";
+        break;
+    case QSysInfo::MV_IOS_5_1:
+        os = "iPhone; iOS 5.1";
+        break;
+    case QSysInfo::MV_IOS_6_0:
+        os = "iPhone; iOS 6.0";
+        break;
+    case QSysInfo::MV_IOS_6_1:
+        os = "iPhone; iOS 6.1";
+        break;
+    case QSysInfo::MV_IOS_7_0:
+        os = "iPhone; iOS 7.0";
+        break;
+    case QSysInfo::MV_IOS_7_1:
+        os = "iPhone; iOS 7.1";
+        break;
+    case QSysInfo::MV_IOS:
+        os = "iPhone; iOS unknown";
+        break;
+    default:
+        os = "Macintosh";
+        break;
+    }
+    return os;
+}
+#endif
+/*
+#ifdef Q_OS_WIN
+#endif
+
+#ifdef Q_OS_LINUX
+#endif
+*/
