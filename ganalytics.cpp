@@ -13,7 +13,8 @@ GAnalytics::GAnalytics(QCoreApplication *parent, const QString trackingID, const
     clientID(clientID),
     request(QUrl("http://www.google-analytics.com/collect")),
     timer(this),
-    networkManager(this)
+    networkManager(this),
+    messagesFileName("messages.dat")
 {
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
     request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
@@ -25,6 +26,18 @@ GAnalytics::GAnalytics(QCoreApplication *parent, const QString trackingID, const
     connect(&timer, SIGNAL(timeout()), this, SLOT(postMessage()));
     language = QLocale::system().nativeLanguageName();
     //screenResolution = getScreenResolution();
+    readMessagesFromFile();
+}
+
+/**
+ * Destructor of class GAnalytics.
+ */
+GAnalytics::~GAnalytics()
+{
+    if (! messageQueue.isEmpty())
+    {
+        storeMessageQueue();
+    }
 }
 
 /**
@@ -287,6 +300,48 @@ QString GAnalytics::getSystemInfo()
 }
 #endif
 
+/**
+ * Store the content of the message queue to a file.
+ * Messages which could not be send are stored into
+ * a file. They can be read when application starts
+ * again.
+ */
+void GAnalytics::storeMessageQueue()
+{
+    printf("Backup left messages.");
+    QFile file(messagesFileName);
+    file.open(QIODevice::WriteOnly);
+    QDataStream outStream(&file);
+    while (! messageQueue.isEmpty())
+    {
+        QUrlQuery msgQuery = messageQueue.dequeue();
+        QString queryString = msgQuery.query();
+        outStream << queryString;
+    }
+}
+
+/**
+ * Reads stored messages from a file.
+ */
+void GAnalytics::readMessagesFromFile()
+{
+    if (! QFile::exists(messagesFileName))
+    {
+        return;
+    }
+    QFile file(messagesFileName);
+    file.open(QIODevice::ReadWrite);
+    QDataStream inStream(&file);
+    while (! inStream.atEnd())
+    {
+        QString queryString;
+        inStream >> queryString;
+        QUrlQuery msgQuery;
+        msgQuery.setQuery(queryString);
+        messageQueue.enqueue(msgQuery);
+    }
+}
+
 #ifdef Q_OS_WIN
 /**
  * Only on Windows
@@ -348,6 +403,10 @@ QString GAnalytics::getSystemInfo()
 {
     struct utsname buf;
     uname(&buf);
+    QString system(buf.sysname);
+    QString release(buf.release);
+
+    return system + "; " + release;
 }
 #endif
 

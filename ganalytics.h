@@ -11,12 +11,14 @@
 #include <QTimer>
 #include <QApplication>
 #include <QDesktopWidget>
+#include <QFile>
 
 class GAnalytics : public QObject
 {
     Q_OBJECT
 public:
     explicit GAnalytics(QCoreApplication *parent, const QString trackingID, const QString clientID);
+    ~GAnalytics();
 
 private:
     QNetworkAccessManager networkManager;
@@ -29,6 +31,7 @@ private:
     QString appVersion;
     QString language;
     QString screenResolution;
+    QString messagesFileName;
 
 signals:
     void postNextMessage();
@@ -49,6 +52,8 @@ private:
     QString getScreenResolution();
     QString getUserAgent();
     QString getSystemInfo();
+    void storeMessageQueue();
+    void readMessagesFromFile();
 
 };
 
