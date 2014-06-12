@@ -7,15 +7,19 @@
  * @param clientID
  * @param withGet       Determines wheather the messages are send with GET or POST.
  */
-GAnalytics::GAnalytics(QCoreApplication *parent, const QString trackingID, const QString clientID) :
+GAnalytics::GAnalytics(QCoreApplication *parent, const QString trackingID) :
     QObject(parent),
     trackingID(trackingID),
-    clientID(clientID),
     request(QUrl("http://www.google-analytics.com/collect")),
     timer(this),
     networkManager(this),
-    messagesFileName("messages.dat")
+    messagesFilePath("~/"),
+    messagesFileName(".postMassages")
 {
+    clientID = getClientID();
+    language = QLocale::system().nativeLanguageName();
+    screenResolution = getScreenResolution();
+    readMessagesFromFile();
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
     request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
     appName = qApp->applicationName();
@@ -24,9 +28,6 @@ GAnalytics::GAnalytics(QCoreApplication *parent, const QString trackingID, const
     connect(this, SIGNAL(postNextMessage()), this, SLOT(postMessage()));
     timer.start(30000);
     connect(&timer, SIGNAL(timeout()), this, SLOT(postMessage()));
-    language = QLocale::system().nativeLanguageName();
-    //screenResolution = getScreenResolution();
-    readMessagesFromFile();
 }
 
 /**
@@ -166,12 +167,10 @@ void GAnalytics::postMessageFinished(QNetworkReply *replay)
     int httpStausCode = replay->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (httpStausCode < 200 || httpStausCode > 299)
     {
-        printf("Error : %i\n", httpStausCode);              // just for testing
-        // An error is occured. Is logging requiered ????
+        // An error ocurred.
         return;
     }
     QUrlQuery remove = messageQueue.dequeue();
-    printf("Send status : OK.\n");                          // just for testing
     emit postNextMessage();
     replay->deleteLater();
 }
@@ -189,7 +188,7 @@ QUrlQuery GAnalytics::buildStandardPostQuery(const QString type)
     query.addQueryItem("tid", trackingID);
     query.addQueryItem("cid", clientID);
     query.addQueryItem("t", type);
-    // Didn't implement: viewPortSize, userID, userIPAddress
+    // Didn't implement: viewPortSize
     query.addQueryItem("sr", screenResolution);
     query.addQueryItem("ul", language);
 
@@ -197,16 +196,15 @@ QUrlQuery GAnalytics::buildStandardPostQuery(const QString type)
 }
 
 /**
- * Get used screen resolution.
+ * Get devicese screen resolution.
  * @return      A QString like "800x600".
  */
 QString GAnalytics::getScreenResolution()
 {
-    QDesktopWidget *desktop = QApplication::desktop();
-    int width = desktop->width();
-    int heigth = desktop->height();
+    QScreen *screen = QGuiApplication::primaryScreen();
+    QSize size = screen->size();
 
-    return QString::number(width) + "x" + QString::number(heigth);
+    return QString::number(size.width()) + "x" + QString::number(size.height());
 }
 
 /**
@@ -221,7 +219,7 @@ QString GAnalytics::getUserAgent()
     QString locale = QLocale::system().name();
     QString system = getSystemInfo();
 
-    return "Mozilla/5.0 (" + system + "; " + locale + ") GAnalytics/1.0 (Qt/" QT_VERSION_STR ")";
+    return appName + "/" + appVersion + " (" + system + "; " + locale + ") GAnalytics/1.0 (Qt/" QT_VERSION_STR ")";
 }
 
 #ifdef Q_OS_MAC
@@ -308,8 +306,8 @@ QString GAnalytics::getSystemInfo()
  */
 void GAnalytics::storeMessageQueue()
 {
-    printf("Backup left messages.");
-    QFile file(messagesFileName);
+    QString filePath(messagesFilePath + messagesFileName);
+    QFile file(filePath);
     file.open(QIODevice::WriteOnly);
     QDataStream outStream(&file);
     while (! messageQueue.isEmpty())
@@ -318,6 +316,7 @@ void GAnalytics::storeMessageQueue()
         QString queryString = msgQuery.query();
         outStream << queryString;
     }
+    file.close();
 }
 
 /**
@@ -325,11 +324,12 @@ void GAnalytics::storeMessageQueue()
  */
 void GAnalytics::readMessagesFromFile()
 {
-    if (! QFile::exists(messagesFileName))
+    QString filePath(messagesFilePath + messagesFileName);
+    if (! QFile::exists(filePath))
     {
         return;
     }
-    QFile file(messagesFileName);
+    QFile file(filePath);
     file.open(QIODevice::ReadWrite);
     QDataStream inStream(&file);
     while (! inStream.atEnd())
@@ -340,6 +340,30 @@ void GAnalytics::readMessagesFromFile()
         msgQuery.setQuery(queryString);
         messageQueue.enqueue(msgQuery);
     }
+    file.close();
+    file.remove();
+}
+
+/**
+ * Get the client id.
+ * Client id once created is stored in application settings.
+ * @return clientID         A string with the client id.
+ */
+QString GAnalytics::getClientID()
+{
+    QSettings settings;
+    QString clientID;
+    if (! settings.contains("GAnalytics-cid"))
+    {
+        clientID = QUuid::createUuid().toString();
+        settings.setValue("GAnalytics-cid", clientID);
+    }
+    else
+    {
+        clientID = settings.value("GAnalytics-cid").toString();
+    }
+
+    return clientID;
 }
 
 #ifdef Q_OS_WIN

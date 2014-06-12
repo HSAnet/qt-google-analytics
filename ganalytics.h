@@ -9,15 +9,17 @@
 #include <QUrlQuery>
 #include <QQueue>
 #include <QTimer>
-#include <QApplication>
-#include <QDesktopWidget>
 #include <QFile>
+#include <QScreen>
+#include <QGuiApplication>
+#include <QSettings>
+#include <QUuid>
 
 class GAnalytics : public QObject
 {
     Q_OBJECT
 public:
-    explicit GAnalytics(QCoreApplication *parent, const QString trackingID, const QString clientID);
+    explicit GAnalytics(QCoreApplication *parent, const QString trackingID);
     ~GAnalytics();
 
 private:
@@ -31,7 +33,22 @@ private:
     QString appVersion;
     QString language;
     QString screenResolution;
+    QString messagesFilePath;
     QString messagesFileName;
+    QString viewportSize;
+
+public:
+    // Getter and Setter
+    void setViewportSize(const QString viewportSize)        { this->viewportSize = viewportSize; }
+    QString getViewportSize() const                         { return viewportSize; }
+    void setLanguage(const QString language)                { this->language = language; }
+    QString getLangugae() const                             { return language; }
+    void setTrackingID(const QString trackingID)            { this->trackingID = trackingID; }
+    QString getTrackingID() const                           { return trackingID; }
+    void setMessagesFilePath(const QString path)            { messagesFilePath = path; }
+    QString getMessagesFilePath() const                     { return messagesFilePath; }
+    void setMessagesFileName(const QString name)            { messagesFileName = name; }
+    QString getMessagesFileName() const                     { return messagesFileName; }
 
 signals:
     void postNextMessage();
@@ -54,6 +71,7 @@ private:
     QString getSystemInfo();
     void storeMessageQueue();
     void readMessagesFromFile();
+    QString getClientID();
 
 };
 
