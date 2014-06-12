@@ -14,7 +14,8 @@ GAnalytics::GAnalytics(QCoreApplication *parent, const QString trackingID) :
     timer(this),
     networkManager(this),
     messagesFilePath("~/"),
-    messagesFileName(".postMassages")
+    messagesFileName(".postMassages"),
+    viewportSize("50x50")
 {
     clientID = getClientID();
     language = QLocale::system().nativeLanguageName();
@@ -188,7 +189,7 @@ QUrlQuery GAnalytics::buildStandardPostQuery(const QString type)
     query.addQueryItem("tid", trackingID);
     query.addQueryItem("cid", clientID);
     query.addQueryItem("t", type);
-    // Didn't implement: viewPortSize
+    query.addQueryItem("vp", viewportSize);
     query.addQueryItem("sr", screenResolution);
     query.addQueryItem("ul", language);
 

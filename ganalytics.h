@@ -49,6 +49,8 @@ public:
     QString getMessagesFilePath() const                     { return messagesFilePath; }
     void setMessagesFileName(const QString name)            { messagesFileName = name; }
     QString getMessagesFileName() const                     { return messagesFileName; }
+    void setTimerIntervall(const int seconds)               { timer.setInterval(seconds * 1000); }
+    int getTimerIntervall() const                           { return timer.interval() / 1000; }
 
 signals:
     void postNextMessage();
