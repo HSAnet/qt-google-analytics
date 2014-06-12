@@ -14,8 +14,7 @@ GAnalytics::GAnalytics(QCoreApplication *parent, const QString trackingID) :
     timer(this),
     networkManager(this),
     messagesFilePath("~/"),
-    messagesFileName(".postMassages"),
-    viewportSize("50x50")
+    messagesFileName(".postMassages")
 {
     clientID = getClientID();
     language = QLocale::system().nativeLanguageName();
