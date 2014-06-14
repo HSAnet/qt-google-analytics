@@ -13,12 +13,12 @@ GAnalytics::GAnalytics(QCoreApplication *parent, const QString trackingID) :
     request(QUrl("http://www.google-analytics.com/collect")),
     timer(this),
     networkManager(this),
-    messagesFilePath("~/"),
     messagesFileName(".postMassages")
 {
+    messagesFilePath = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
     clientID = getClientID();
     language = QLocale::system().nativeLanguageName();
-    screenResolution = getScreenResolution();
+    //screenResolution = getScreenResolution();
     readMessagesFromFile();
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
     request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
@@ -309,12 +309,12 @@ void GAnalytics::storeMessageQueue()
     QString filePath(messagesFilePath + messagesFileName);
     QFile file(filePath);
     file.open(QIODevice::WriteOnly);
-    QDataStream outStream(&file);
     while (! messageQueue.isEmpty())
     {
         QUrlQuery msgQuery = messageQueue.dequeue();
         QString queryString = msgQuery.query();
-        outStream << queryString;
+        file.write(queryString.toUtf8());
+        file.write("\n");       // new line
     }
     file.close();
 }
@@ -331,11 +331,12 @@ void GAnalytics::readMessagesFromFile()
     }
     QFile file(filePath);
     file.open(QIODevice::ReadWrite);
-    QDataStream inStream(&file);
-    while (! inStream.atEnd())
+    while (! file.atEnd())
     {
-        QString queryString;
-        inStream >> queryString;
+        QByteArray line = file.readLine();
+        int pos = line.size() - 1;
+        line = line.remove(pos, 1);     // remove new line symbol "\n" from string
+        QString queryString(line);
         QUrlQuery msgQuery;
         msgQuery.setQuery(queryString);
         messageQueue.enqueue(msgQuery);

@@ -14,6 +14,7 @@
 #include <QGuiApplication>
 #include <QSettings>
 #include <QUuid>
+#include <QStandardPaths>
 
 class GAnalytics : public QObject
 {
