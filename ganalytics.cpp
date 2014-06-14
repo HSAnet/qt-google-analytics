@@ -18,7 +18,7 @@ GAnalytics::GAnalytics(QCoreApplication *parent, const QString trackingID) :
     messagesFilePath = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
     clientID = getClientID();
     language = QLocale::system().nativeLanguageName();
-    //screenResolution = getScreenResolution();
+    screenResolution = getScreenResolution();
     readMessagesFromFile();
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
     request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
