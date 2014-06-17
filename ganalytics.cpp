@@ -7,7 +7,7 @@
  * @param clientID
  * @param withGet       Determines wheather the messages are send with GET or POST.
  */
-GAnalytics::GAnalytics(QCoreApplication *parent, const QString trackingID) :
+GAnalytics::GAnalytics(const QString &trackingID, QObject *parent) :
     QObject(parent),
     trackingID(trackingID),
     request(QUrl("http://www.google-analytics.com/collect")),
@@ -23,7 +23,7 @@ GAnalytics::GAnalytics(QCoreApplication *parent, const QString trackingID) :
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
     request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
     appName = qApp->applicationName();
-    appVersion = parent->applicationVersion();
+    appVersion = qApp->applicationVersion();
     connect(&networkManager, SIGNAL(finished(QNetworkReply*)), this, SLOT(postMessageFinished(QNetworkReply*)));
     connect(this, SIGNAL(postNextMessage()), this, SLOT(postMessage()));
     timer.start(30000);
@@ -52,15 +52,15 @@ GAnalytics::~GAnalytics()
  */
 void GAnalytics::sendAppview(const QString screenName)
 {
-    QUrlQuery *query = buildStandardPostQuery("appview");
+    QUrlQuery query = buildStandardPostQuery("appview");
     if (! screenName.isEmpty())
     {
-        query->addQueryItem("cd", screenName);
+        query.addQueryItem("cd", screenName);
     }
-    query->addQueryItem("an", this->appName);
-    query->addQueryItem("av", this->appVersion);
+    query.addQueryItem("an", this->appName);
+    query.addQueryItem("av", this->appVersion);
 
-    enqueWithCurrentTime(query);
+    enqueQueryWithCurrentTime(query);
 }
 
 /**
@@ -74,19 +74,19 @@ void GAnalytics::sendAppview(const QString screenName)
  */
 void GAnalytics::sendEvent(const QString eventCategory, const QString eventAction, const QString eventLabel, const QVariant eventValue)
 {
-    QUrlQuery *query = buildStandardPostQuery("event");
-    query->addQueryItem("an", appName);
-    query->addQueryItem("av", appVersion);
+    QUrlQuery query = buildStandardPostQuery("event");
+    query.addQueryItem("an", appName);
+    query.addQueryItem("av", appVersion);
     if (! eventCategory.isEmpty())
-        query->addQueryItem("ec", eventCategory);
+        query.addQueryItem("ec", eventCategory);
     if (! eventAction.isEmpty())
-        query->addQueryItem("ea", eventAction);
+        query.addQueryItem("ea", eventAction);
     if (! eventLabel.isEmpty())
-        query->addQueryItem("el", eventLabel);
+        query.addQueryItem("el", eventLabel);
     if (eventValue.isValid())
-        query->addQueryItem("ev", eventValue.toString());
+        query.addQueryItem("ev", eventValue.toString());
 
-    enqueWithCurrentTime(query);
+    enqueQueryWithCurrentTime(query);
 }
 
 /**
@@ -96,20 +96,20 @@ void GAnalytics::sendEvent(const QString eventCategory, const QString eventActio
  * @param exceptionDescription
  * @param exceptionFatal
  */
-void GAnalytics::sendException(const QString exceptionDescription, const bool exceptionFatal)
+void GAnalytics::sendException(const QString &exceptionDescription, const bool exceptionFatal)
 {
-    QUrlQuery *query = buildStandardPostQuery("exception");
-    query->addQueryItem("exd", exceptionDescription);
+    QUrlQuery query = buildStandardPostQuery("exception");
+    query.addQueryItem("exd", exceptionDescription);
     if (exceptionFatal)
     {
-        query->addQueryItem("exf", "1");
+        query.addQueryItem("exf", "1");
     }
     else
     {
-        query->addQueryItem("exf", "0");
+        query.addQueryItem("exf", "0");
     }
 
-    enqueWithCurrentTime(query);
+    enqueQueryWithCurrentTime(query);
 }
 
 /**
@@ -119,10 +119,10 @@ void GAnalytics::sendException(const QString exceptionDescription, const bool ex
  */
 void GAnalytics::endSession()
 {
-    QUrlQuery *query = buildStandardPostQuery("event");
-    query->addQueryItem("sc", "end");
+    QUrlQuery query = buildStandardPostQuery("event");
+    query.addQueryItem("sc", "end");
 
-    enqueWithCurrentTime(query);
+    enqueQueryWithCurrentTime(query);
 }
 
 /**
@@ -147,10 +147,10 @@ void GAnalytics::postMessage()
         connection = "keep-alive";
     }
     QueryBuffer buffer = messageQueue.head();
-    QUrlQuery *param = getQueryWithQueueTime(buffer);
+    QUrlQuery param = getQueryWithQueueTime(buffer);
     request.setRawHeader("Connection", connection.toUtf8());
-    request.setHeader(QNetworkRequest::ContentLengthHeader, param->toString().length());
-    networkManager.post(request, param->query(QUrl::EncodeUnicode).toUtf8());
+    request.setHeader(QNetworkRequest::ContentLengthHeader, param.toString().length());
+    networkManager.post(request, param.query(QUrl::EncodeUnicode).toUtf8());
 }
 
 /**
@@ -172,8 +172,6 @@ void GAnalytics::postMessageFinished(QNetworkReply *replay)
         return;
     }
     QueryBuffer remove = messageQueue.dequeue();
-    delete remove.time;
-    delete remove.query;
     emit postNextMessage();
     replay->deleteLater();
 }
@@ -184,16 +182,16 @@ void GAnalytics::postMessageFinished(QNetworkReply *replay)
  * @param type      Type of POST message. The event which is to post.
  * @return query    Most used parameter in a query for a POST.
  */
-QUrlQuery* GAnalytics::buildStandardPostQuery(const QString type)
+QUrlQuery GAnalytics::buildStandardPostQuery(const QString &type)
 {
-    QUrlQuery *query = new QUrlQuery;
-    query->addQueryItem("v", "1");
-    query->addQueryItem("tid", trackingID);
-    query->addQueryItem("cid", clientID);
-    query->addQueryItem("t", type);
-    query->addQueryItem("vp", viewportSize);
-    query->addQueryItem("sr", screenResolution);
-    query->addQueryItem("ul", language);
+    QUrlQuery query;
+    query.addQueryItem("v", "1");
+    query.addQueryItem("tid", trackingID);
+    query.addQueryItem("cid", clientID);
+    query.addQueryItem("t", type);
+    query.addQueryItem("vp", viewportSize);
+    query.addQueryItem("sr", screenResolution);
+    query.addQueryItem("ul", language);
 
     return query;
 }
@@ -316,12 +314,12 @@ void GAnalytics::persistMessageQueue()
     while (! messageQueue.isEmpty())
     {
         QueryBuffer buffer = messageQueue.dequeue();
-        QUrlQuery *msgQuery = buffer.query;
-        QString queryString = msgQuery->query();
+        QString queryString = buffer.postQuery.query();
         file.write(queryString.toUtf8());
         file.write("\n");       // new line
-        delete buffer.time;
-        delete buffer.query;
+        QString dateTime = buffer.time.toString();
+        file.write(dateTime.toUtf8());
+        file.write("\n");
     }
     file.close();
 }
@@ -342,13 +340,13 @@ void GAnalytics::readMessagesFromFile()
     file.open(QIODevice::ReadWrite);
     while (! file.atEnd())
     {
+        QueryBuffer buffer;
         QByteArray line = file.readLine();
-        int pos = line.size() - 1;
-        line = line.remove(pos, 1);     // remove new line symbol "\n" from string
-        QString queryString(line);
-        QUrlQuery *msgQuery = new QUrlQuery;
-        msgQuery->setQuery(queryString);
-        enqueWithCurrentTime(msgQuery);
+        QString queryString = removeNewLineSymbol(line);
+        buffer.postQuery = QUrlQuery(queryString);
+        line = file.readLine();
+        QString dateTimeString = removeNewLineSymbol(line);
+        buffer.time = QDateTime::fromString(dateTimeString);
     }
     file.close();
     file.remove();
@@ -382,12 +380,11 @@ QString GAnalytics::getClientID()
  * will be stored in the message queue.
  * @param query
  */
-void GAnalytics::enqueWithCurrentTime(QUrlQuery *query)
+void GAnalytics::enqueQueryWithCurrentTime(QUrlQuery &query)
 {
     QueryBuffer buffer;
-    buffer.query = query;
-    buffer.time = new QTime;
-    buffer.time->start();
+    buffer.postQuery = query;
+    buffer.time = QDateTime::currentDateTime();
 
     messageQueue.enqueue(buffer);
 }
@@ -400,12 +397,27 @@ void GAnalytics::enqueWithCurrentTime(QUrlQuery *query)
  * @param buffer
  * @return query        The query with meantime added.
  */
-QUrlQuery *GAnalytics::getQueryWithQueueTime(GAnalytics::QueryBuffer &buffer)
+QUrlQuery GAnalytics::getQueryWithQueueTime(GAnalytics::QueryBuffer &buffer)
 {
-    int queueTime = buffer.time->elapsed();
-    buffer.query->addQueryItem("qt", QString::number(queueTime));
+    QDateTime now = QDateTime::currentDateTime();
+    int queueTime = buffer.time.msecsTo(now);
+    buffer.postQuery.addQueryItem("qt", QString::number(queueTime));
 
-    return buffer.query;
+    return buffer.postQuery;
+}
+
+/**
+ * Takes a QByteArray which contains a new line symbol at the end.
+ * The "\n" symbol at the end will be removed.
+ * @param line
+ * @return       Returns a QString without end line symbol.
+ */
+QString GAnalytics::removeNewLineSymbol(QByteArray &line)
+{
+    int pos = line.size() - 1;
+    line = line.remove(pos, 1);
+
+    return QString(line);
 }
 
 #ifdef Q_OS_WIN
