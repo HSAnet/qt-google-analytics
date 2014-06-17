@@ -15,6 +15,7 @@
 #include <QSettings>
 #include <QUuid>
 #include <QStandardPaths>
+#include <QTime>
 
 class GAnalytics : public QObject
 {
@@ -25,7 +26,8 @@ public:
 
 private:
     QNetworkAccessManager networkManager;
-    QQueue<QUrlQuery> messageQueue;
+    struct QueryBuffer { QUrlQuery *query; QTime *time; };
+    QQueue<QueryBuffer> messageQueue;
     QTimer timer;
     QNetworkRequest request;
     QString trackingID;
@@ -68,13 +70,15 @@ public slots:
     void postMessageFinished(QNetworkReply *replay);
 
 private:
-    QUrlQuery buildStandardPostQuery(const QString type);
+    QUrlQuery *buildStandardPostQuery(const QString type);
     QString getScreenResolution();
     QString getUserAgent();
     QString getSystemInfo();
-    void storeMessageQueue();
+    void persistMessageQueue();
     void readMessagesFromFile();
     QString getClientID();
+    void enqueWithCurrentTime(QUrlQuery *query);
+    QUrlQuery *getQueryWithQueueTime(QueryBuffer &buffer);
 
 };
 
