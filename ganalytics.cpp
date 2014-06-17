@@ -27,7 +27,7 @@ public:
     {
         messagesFilePath = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
         clientID = getClientID();
-        language = QLocale::system().nativeLanguageName();
+        language = QLocale::system().name().toLower().replace("_", "-");
         screenResolution = getScreenResolution();
         readMessagesFromFile();
         request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
