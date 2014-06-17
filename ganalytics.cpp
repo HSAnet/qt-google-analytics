@@ -1,180 +1,70 @@
 #include "ganalytics.h"
+#include <QQueue>
+#include <QTimer>
+#include <QFile>
+#include <QScreen>
+#include <QGuiApplication>
+#include <QSettings>
+#include <QUuid>
+#include <QStandardPaths>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+
 
 /**
- * Constructs the GAnalytics Object.
- * @param parent        The application which uses this object.
- * @param trackingID
- * @param clientID
- * @param withGet       Determines wheather the messages are send with GET or POST.
+ * Class Private
+ * Private members and functions.
  */
-GAnalytics::GAnalytics(const QString &trackingID, QObject *parent) :
-    QObject(parent),
-    trackingID(trackingID),
-    request(QUrl("http://www.google-analytics.com/collect")),
-    timer(this),
-    networkManager(this),
-    messagesFileName(".postMassages")
+class GAnalytics::Private
 {
-    messagesFilePath = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
-    clientID = getClientID();
-    language = QLocale::system().nativeLanguageName();
-    screenResolution = getScreenResolution();
-    readMessagesFromFile();
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
-    request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
-    appName = qApp->applicationName();
-    appVersion = qApp->applicationVersion();
-    connect(&networkManager, SIGNAL(finished(QNetworkReply*)), this, SLOT(postMessageFinished(QNetworkReply*)));
-    connect(this, SIGNAL(postNextMessage()), this, SLOT(postMessage()));
-    timer.start(30000);
-    connect(&timer, SIGNAL(timeout()), this, SLOT(postMessage()));
-}
 
-/**
- * Destructor of class GAnalytics.
- */
-GAnalytics::~GAnalytics()
-{
-    if (! messageQueue.isEmpty())
+public:
+    Private(QObject *parent = 0) :
+        request(QUrl("http://www.google-analytics.com/collect")),
+        messagesFileName(".postMassages"),
+        networkManager(parent),
+        timer(parent)
     {
-        persistMessageQueue();
-    }
-}
-
-/**
- * SentAppview is called when the user changed the applications view.
- * These action of the user should be noticed and reported. Therefore
- * a QUrlQuery is build in this method. It holts all the parameter for
- * a http POST. The UrlQuery will be stored in a message Queue.
- * @param appName
- * @param appVersion
- * @param screenName
- */
-void GAnalytics::sendAppview(const QString screenName)
-{
-    QUrlQuery query = buildStandardPostQuery("appview");
-    if (! screenName.isEmpty())
-    {
-        query.addQueryItem("cd", screenName);
-    }
-    query.addQueryItem("an", this->appName);
-    query.addQueryItem("av", this->appVersion);
-
-    enqueQueryWithCurrentTime(query);
-}
-
-/**
- * This method is called whenever a button was pressed in the application.
- * A query for a POST message will be created to report this event. The
- * created query will be stored in a message queue.
- * @param eventCategory
- * @param eventAction
- * @param eventLabel
- * @param eventValue
- */
-void GAnalytics::sendEvent(const QString eventCategory, const QString eventAction, const QString eventLabel, const QVariant eventValue)
-{
-    QUrlQuery query = buildStandardPostQuery("event");
-    query.addQueryItem("an", appName);
-    query.addQueryItem("av", appVersion);
-    if (! eventCategory.isEmpty())
-        query.addQueryItem("ec", eventCategory);
-    if (! eventAction.isEmpty())
-        query.addQueryItem("ea", eventAction);
-    if (! eventLabel.isEmpty())
-        query.addQueryItem("el", eventLabel);
-    if (eventValue.isValid())
-        query.addQueryItem("ev", eventValue.toString());
-
-    enqueQueryWithCurrentTime(query);
-}
-
-/**
- * Method is called after an exception was raised. It builds a
- * query for a POST message. These query will be stored in a
- * message queue.
- * @param exceptionDescription
- * @param exceptionFatal
- */
-void GAnalytics::sendException(const QString &exceptionDescription, const bool exceptionFatal)
-{
-    QUrlQuery query = buildStandardPostQuery("exception");
-    query.addQueryItem("exd", exceptionDescription);
-    if (exceptionFatal)
-    {
-        query.addQueryItem("exf", "1");
-    }
-    else
-    {
-        query.addQueryItem("exf", "0");
+        messagesFilePath = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
+        clientID = getClientID();
+        language = QLocale::system().nativeLanguageName();
+        screenResolution = getScreenResolution();
+        readMessagesFromFile();
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+        request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
+        appName = qApp->applicationName();
+        appVersion = qApp->applicationVersion();
     }
 
-    enqueQueryWithCurrentTime(query);
-}
+    QNetworkAccessManager networkManager;
+    QQueue<QueryBuffer> messageQueue;
+    QTimer timer;
+    QNetworkRequest request;
+    QString trackingID;
+    QString clientID;
+    QString appName;
+    QString appVersion;
+    QString language;
+    QString screenResolution;
+    QString messagesFilePath;
+    QString messagesFileName;
+    QString viewportSize;
 
-/**
- * Session ends. This event will be sent by a POST message.
- * Query is setup in this method and stored in the message
- * queue.
- */
-void GAnalytics::endSession()
-{
-    QUrlQuery query = buildStandardPostQuery("event");
-    query.addQueryItem("sc", "end");
+public:
+    QUrlQuery buildStandardPostQuery(const QString &type);
+    QString getScreenResolution();
+    QString getUserAgent();
+    QString getSystemInfo();
+    void persistMessageQueue();
+    void readMessagesFromFile();
+    QString getClientID();
+    void enqueQueryWithCurrentTime(QUrlQuery &query);
+    QUrlQuery getQueryWithQueueTime(QueryBuffer &buffer);
+    QString removeNewLineSymbol(QByteArray &line);
+    QNetworkAccessManager *getNetworkManager()                  { return &networkManager; }
+    QTimer *getTimer()                                          { return &timer; }
 
-    enqueQueryWithCurrentTime(query);
-}
-
-/**
- * This function is called by a timer interval.
- * The function tries to send a messages from the queue.
- * If message was successfully send then this function
- * will be called back to send next message.
- * If message queue contains more than one message then
- * the connection will kept open.
- * The message POST is asyncroniously when the server
- * answered a signal will be emitted.
- */
-void GAnalytics::postMessage()
-{
-    if (messageQueue.isEmpty())
-    {
-        return;
-    }
-    QString connection = "close";
-    if (messageQueue.count() > 1)
-    {
-        connection = "keep-alive";
-    }
-    QueryBuffer buffer = messageQueue.head();
-    QUrlQuery param = getQueryWithQueueTime(buffer);
-    request.setRawHeader("Connection", connection.toUtf8());
-    request.setHeader(QNetworkRequest::ContentLengthHeader, param.toString().length());
-    networkManager.post(request, param.query(QUrl::EncodeUnicode).toUtf8());
-}
-
-/**
- * NetworkAccsessManager has finished to POST a message.
- * If POST message was successfully send then the message
- * query should be removed from queue.
- * SIGNAL "postMessage" will be emitted to send next message
- * if there is any.
- * If message couldn't be send then next try is when the
- * timer emits its signal.
- * @param replay    Replay to the http POST.
- */
-void GAnalytics::postMessageFinished(QNetworkReply *replay)
-{
-    int httpStausCode = replay->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    if (httpStausCode < 200 || httpStausCode > 299)
-    {
-        // An error ocurred.
-        return;
-    }
-    QueryBuffer remove = messageQueue.dequeue();
-    emit postNextMessage();
-    replay->deleteLater();
-}
+};
 
 /**
  * Build the POST query. Adds all parameter to the query
@@ -182,7 +72,7 @@ void GAnalytics::postMessageFinished(QNetworkReply *replay)
  * @param type      Type of POST message. The event which is to post.
  * @return query    Most used parameter in a query for a POST.
  */
-QUrlQuery GAnalytics::buildStandardPostQuery(const QString &type)
+QUrlQuery GAnalytics::Private::buildStandardPostQuery(const QString &type)
 {
     QUrlQuery query;
     query.addQueryItem("v", "1");
@@ -195,18 +85,18 @@ QUrlQuery GAnalytics::buildStandardPostQuery(const QString &type)
 
     return query;
 }
-
 /**
  * Get devicese screen resolution.
  * @return      A QString like "800x600".
  */
-QString GAnalytics::getScreenResolution()
+QString GAnalytics::Private::getScreenResolution()
 {
     QScreen *screen = QGuiApplication::primaryScreen();
     QSize size = screen->size();
 
     return QString::number(size.width()) + "x" + QString::number(size.height());
 }
+
 
 /**
  * Try to gain information about the system where this application
@@ -215,7 +105,7 @@ QString GAnalytics::getScreenResolution()
  * All this information will be send in POST messages.
  * @return agent        A QString with all the information formatted for a POST message.
  */
-QString GAnalytics::getUserAgent()
+QString GAnalytics::Private::getUserAgent()
 {
     QString locale = QLocale::system().name();
     QString system = getSystemInfo();
@@ -223,13 +113,14 @@ QString GAnalytics::getUserAgent()
     return appName + "/" + appVersion + " (" + system + "; " + locale + ") GAnalytics/1.0 (Qt/" QT_VERSION_STR ")";
 }
 
+
 #ifdef Q_OS_MAC
 /**
  * Only on Mac OS X
  * Get the Operating system name and version.
  * @return os   The operating system name and version in a string.
  */
-QString GAnalytics::getSystemInfo()
+QString GAnalytics::Private::getSystemInfo()
 {
     QSysInfo::MacVersion version = QSysInfo::macVersion();
     QString os;
@@ -299,134 +190,13 @@ QString GAnalytics::getSystemInfo()
 }
 #endif
 
-/**
- * Store the content of the message queue to a file.
- * Messages which could not be send are stored into
- * a file. They can be read when application starts
- * again.
- * Queue time information is dropped here.
- */
-void GAnalytics::persistMessageQueue()
-{
-    QString filePath(messagesFilePath + messagesFileName);
-    QFile file(filePath);
-    file.open(QIODevice::WriteOnly);
-    while (! messageQueue.isEmpty())
-    {
-        QueryBuffer buffer = messageQueue.dequeue();
-        QString queryString = buffer.postQuery.query();
-        file.write(queryString.toUtf8());
-        file.write("\n");       // new line
-        QString dateTime = buffer.time.toString();
-        file.write(dateTime.toUtf8());
-        file.write("\n");
-    }
-    file.close();
-}
-
-/**
- * Reads persistent messages from a file.
- * Messages will get a new Queue time here.
- * Time measuring of queue time starts again.
- */
-void GAnalytics::readMessagesFromFile()
-{
-    QString filePath(messagesFilePath + messagesFileName);
-    if (! QFile::exists(filePath))
-    {
-        return;
-    }
-    QFile file(filePath);
-    file.open(QIODevice::ReadWrite);
-    while (! file.atEnd())
-    {
-        QueryBuffer buffer;
-        QByteArray line = file.readLine();
-        QString queryString = removeNewLineSymbol(line);
-        buffer.postQuery = QUrlQuery(queryString);
-        line = file.readLine();
-        QString dateTimeString = removeNewLineSymbol(line);
-        buffer.time = QDateTime::fromString(dateTimeString);
-    }
-    file.close();
-    file.remove();
-}
-
-/**
- * Get the client id.
- * Client id once created is stored in application settings.
- * @return clientID         A string with the client id.
- */
-QString GAnalytics::getClientID()
-{
-    QSettings settings;
-    QString clientID;
-    if (! settings.contains("GAnalytics-cid"))
-    {
-        clientID = QUuid::createUuid().toString();
-        settings.setValue("GAnalytics-cid", clientID);
-    }
-    else
-    {
-        clientID = settings.value("GAnalytics-cid").toString();
-    }
-
-    return clientID;
-}
-
-/**
- * Takes a QUrlQuery object and wrapp it together with
- * a QTime object into a QueryBuffer struct. These struct
- * will be stored in the message queue.
- * @param query
- */
-void GAnalytics::enqueQueryWithCurrentTime(QUrlQuery &query)
-{
-    QueryBuffer buffer;
-    buffer.postQuery = query;
-    buffer.time = QDateTime::currentDateTime();
-
-    messageQueue.enqueue(buffer);
-}
-
-/**
- * Gets the QTime object from the QueryBuffer structure and
- * calculats the time which has been elapsed while message
- * was in queue. The meantime of buffering message in msec
- * is added to the query.
- * @param buffer
- * @return query        The query with meantime added.
- */
-QUrlQuery GAnalytics::getQueryWithQueueTime(GAnalytics::QueryBuffer &buffer)
-{
-    QDateTime now = QDateTime::currentDateTime();
-    int queueTime = buffer.time.msecsTo(now);
-    buffer.postQuery.addQueryItem("qt", QString::number(queueTime));
-
-    return buffer.postQuery;
-}
-
-/**
- * Takes a QByteArray which contains a new line symbol at the end.
- * The "\n" symbol at the end will be removed.
- * @param line
- * @return       Returns a QString without end line symbol.
- */
-QString GAnalytics::removeNewLineSymbol(QByteArray &line)
-{
-    int pos = line.size() - 1;
-    line = line.remove(pos, 1);
-
-    return QString(line);
-}
-
 #ifdef Q_OS_WIN
 /**
  * Only on Windows
  * Get operating system and its version.
  * @return os   A QString containing the oprating systems name and version.
  */
-QString GAnalytics::getSystemInfo()
+QString GAnalytics::Private::getSystemInfo()
 {
     QSysInfo::WindowsVersion version = QSysInfo::windowsVersion();
     QString os("Windows; ");
@@ -477,7 +247,7 @@ QString GAnalytics::getSystemInfo()
  * Get operation system name and version.
  * @return os       A QString with the name and version of the operating system.
  */
-QString GAnalytics::getSystemInfo()
+QString GAnalytics::Private::getSystemInfo()
 {
     struct utsname buf;
     uname(&buf);
@@ -488,3 +258,354 @@ QString GAnalytics::getSystemInfo()
 }
 #endif
 
+
+/**
+ * Store the content of the message queue to a file.
+ * Messages which could not be send are stored into
+ * a file. They can be read when application starts
+ * again.
+ * Queue time information is dropped here.
+ */
+void GAnalytics::Private::persistMessageQueue()
+{
+    QString filePath(messagesFilePath + messagesFileName);
+    QFile file(filePath);
+    file.open(QIODevice::WriteOnly);
+    while (! messageQueue.isEmpty())
+    {
+        QueryBuffer buffer = messageQueue.dequeue();
+        QString queryString = buffer.postQuery.query();
+        file.write(queryString.toUtf8());
+        file.write("\n");       // new line
+        QString dateTime = buffer.time.toString();
+        file.write(dateTime.toUtf8());
+        file.write("\n");
+    }
+    file.close();
+}
+
+/**
+ * Reads persistent messages from a file.
+ * Messages will get a new Queue time here.
+ * Time measuring of queue time starts again.
+ */
+void GAnalytics::Private::readMessagesFromFile()
+{
+    QString filePath(messagesFilePath + messagesFileName);
+    if (! QFile::exists(filePath))
+    {
+        return;
+    }
+    QFile file(filePath);
+    file.open(QIODevice::ReadWrite);
+    while (! file.atEnd())
+    {
+        QueryBuffer buffer;
+        QByteArray line = file.readLine();
+        QString queryString = removeNewLineSymbol(line);
+        buffer.postQuery = QUrlQuery(queryString);
+        line = file.readLine();
+        QString dateTimeString = removeNewLineSymbol(line);
+        buffer.time = QDateTime::fromString(dateTimeString);
+    }
+    file.close();
+    file.remove();
+}
+
+
+/**
+ * Get the client id.
+ * Client id once created is stored in application settings.
+ * @return clientID         A string with the client id.
+ */
+QString GAnalytics::Private::getClientID()
+{
+    QSettings settings;
+    QString clientID;
+    if (! settings.contains("GAnalytics-cid"))
+    {
+        clientID = QUuid::createUuid().toString();
+        settings.setValue("GAnalytics-cid", clientID);
+    }
+    else
+    {
+        clientID = settings.value("GAnalytics-cid").toString();
+    }
+
+    return clientID;
+}
+
+/**
+ * Takes a QUrlQuery object and wrapp it together with
+ * a QTime object into a QueryBuffer struct. These struct
+ * will be stored in the message queue.
+ * @param query
+ */
+void GAnalytics::Private::enqueQueryWithCurrentTime(QUrlQuery &query)
+{
+    QueryBuffer buffer;
+    buffer.postQuery = query;
+    buffer.time = QDateTime::currentDateTime();
+
+    messageQueue.enqueue(buffer);
+}
+
+/**
+ * Gets the QTime object from the QueryBuffer structure and
+ * calculats the time which has been elapsed while message
+ * was in queue. The meantime of buffering message in msec
+ * is added to the query.
+ * @param buffer
+ * @return query        The query with meantime added.
+*/
+QUrlQuery GAnalytics::Private::getQueryWithQueueTime(QueryBuffer &buffer)
+{
+    QDateTime now = QDateTime::currentDateTime();
+    int queueTime = buffer.time.msecsTo(now);
+    buffer.postQuery.addQueryItem("qt", QString::number(queueTime));
+
+    return buffer.postQuery;
+}
+
+/**
+* Takes a QByteArray which contains a new line symbol at the end.
+* The "\n" symbol at the end will be removed.
+* @param line
+* @return       Returns a QString without end line symbol.
+*/
+QString GAnalytics::Private::removeNewLineSymbol(QByteArray &line)
+{
+    int pos = line.size() - 1;
+    line = line.remove(pos, 1);
+
+    return QString(line);
+}
+
+
+/**
+ * CONSTRUCTOR  GAnalytics
+ * ------------------------------------------------------------------------------------------------------------
+ * Constructs the GAnalytics Object.
+ * @param parent        The application which uses this object.
+ * @param trackingID
+ * @param clientID
+ * @param withGet       Determines wheather the messages are send with GET or POST.
+ */
+GAnalytics::GAnalytics(const QString &trackingID, QObject *parent) :
+    QObject(parent),
+    analyticsPrivate(new Private(this))
+{
+    setTrackingID(trackingID);
+    connect(analyticsPrivate->getNetworkManager(), SIGNAL(finished(QNetworkReply*)), this, SLOT(postMessageFinished(QNetworkReply*)));
+    connect(this, SIGNAL(postNextMessage()), this, SLOT(postMessage()));
+    analyticsPrivate->timer.start(30000);
+    connect(analyticsPrivate->getTimer(), SIGNAL(timeout()), this, SLOT(postMessage()));
+}
+
+/**
+ * Destructor of class GAnalytics.
+ */
+GAnalytics::~GAnalytics()
+{
+    if (! analyticsPrivate->messageQueue.isEmpty())
+    {
+        analyticsPrivate->persistMessageQueue();
+    }
+    delete analyticsPrivate;
+}
+
+// SETTER and GETTER
+void GAnalytics::setViewportSize(const QString &viewportSize)
+{
+    analyticsPrivate->viewportSize = viewportSize;
+}
+
+QString GAnalytics::getViewportSize() const
+{
+    return analyticsPrivate->viewportSize;
+}
+
+void GAnalytics::setLanguage(const QString &language)
+{
+    analyticsPrivate->language = language;
+}
+
+QString GAnalytics::getLangugae() const
+{
+    return analyticsPrivate->language;
+}
+
+void GAnalytics::setTrackingID(const QString &trackingID)
+{
+    analyticsPrivate->trackingID = trackingID;
+}
+
+QString GAnalytics::getTrackingID() const
+{
+    return analyticsPrivate->trackingID;
+}
+
+void GAnalytics::setMessagesFilePath(const QString &path)
+{
+    analyticsPrivate->messagesFileName = path;
+}
+
+QString GAnalytics::getMessagesFilePath() const
+{
+    return analyticsPrivate->messagesFilePath;
+}
+
+void GAnalytics::setMessagesFileName(const QString &name)
+{
+    analyticsPrivate->messagesFileName = name;
+}
+
+QString GAnalytics::getMessagesFileName() const
+{
+    return analyticsPrivate->messagesFileName;
+}
+
+void GAnalytics::setTimerIntervall(const int seconds)
+{
+    analyticsPrivate->timer.setInterval(seconds * 1000);
+}
+
+int GAnalytics::getTimerIntervall() const
+{
+    return (analyticsPrivate->timer.interval() / 1000);
+}
+
+/**
+ * SentAppview is called when the user changed the applications view.
+ * These action of the user should be noticed and reported. Therefore
+ * a QUrlQuery is build in this method. It holts all the parameter for
+ * a http POST. The UrlQuery will be stored in a message Queue.
+ * @param appName
+ * @param appVersion
+ * @param screenName
+ */
+void GAnalytics::sendAppview(const QString screenName)
+{
+    QUrlQuery query = analyticsPrivate->buildStandardPostQuery("appview");
+    if (! screenName.isEmpty())
+    {
+        query.addQueryItem("cd", screenName);
+    }
+    query.addQueryItem("an", analyticsPrivate->appName);
+    query.addQueryItem("av", analyticsPrivate->appVersion);
+
+    analyticsPrivate->enqueQueryWithCurrentTime(query);
+}
+
+/**
+ * This method is called whenever a button was pressed in the application.
+ * A query for a POST message will be created to report this event. The
+ * created query will be stored in a message queue.
+ * @param eventCategory
+ * @param eventAction
+ * @param eventLabel
+ * @param eventValue
+ */
+void GAnalytics::sendEvent(const QString eventCategory, const QString eventAction, const QString eventLabel, const QVariant eventValue)
+{
+    QUrlQuery query = analyticsPrivate->buildStandardPostQuery("event");
+    query.addQueryItem("an", analyticsPrivate->appName);
+    query.addQueryItem("av", analyticsPrivate->appVersion);
+    if (! eventCategory.isEmpty())
+        query.addQueryItem("ec", eventCategory);
+    if (! eventAction.isEmpty())
+        query.addQueryItem("ea", eventAction);
+    if (! eventLabel.isEmpty())
+        query.addQueryItem("el", eventLabel);
+    if (eventValue.isValid())
+        query.addQueryItem("ev", eventValue.toString());
+
+    analyticsPrivate->enqueQueryWithCurrentTime(query);
+}
+
+/**
+ * Method is called after an exception was raised. It builds a
+ * query for a POST message. These query will be stored in a
+ * message queue.
+ * @param exceptionDescription
+ * @param exceptionFatal
+ */
+void GAnalytics::sendException(const QString &exceptionDescription, const bool exceptionFatal)
+{
+    QUrlQuery query = analyticsPrivate->buildStandardPostQuery("exception");
+    query.addQueryItem("exd", exceptionDescription);
+    if (exceptionFatal)
+    {
+        query.addQueryItem("exf", "1");
+    }
+    else
+    {
+        query.addQueryItem("exf", "0");
+    }
+
+    analyticsPrivate->enqueQueryWithCurrentTime(query);
+}
+
+/**
+ * Session ends. This event will be sent by a POST message.
+ * Query is setup in this method and stored in the message
+ * queue.
+ */
+void GAnalytics::endSession()
+{
+    QUrlQuery query = analyticsPrivate->buildStandardPostQuery("event");
+    query.addQueryItem("sc", "end");
+
+    analyticsPrivate->enqueQueryWithCurrentTime(query);
+}
+
+/**
+ * This function is called by a timer interval.
+ * The function tries to send a messages from the queue.
+ * If message was successfully send then this function
+ * will be called back to send next message.
+ * If message queue contains more than one message then
+ * the connection will kept open.
+ * The message POST is asyncroniously when the server
+ * answered a signal will be emitted.
+ */
+void GAnalytics::postMessage()
+{
+    if (analyticsPrivate->messageQueue.isEmpty())
+    {
+        return;
+    }
+    QString connection = "close";
+    if (analyticsPrivate->messageQueue.count() > 1)
+    {
+        connection = "keep-alive";
+    }
+    QueryBuffer buffer = analyticsPrivate->messageQueue.head();
+    QUrlQuery param = analyticsPrivate->getQueryWithQueueTime(buffer);
+    analyticsPrivate->request.setRawHeader("Connection", connection.toUtf8());
+    analyticsPrivate->request.setHeader(QNetworkRequest::ContentLengthHeader, param.toString().length());
+    analyticsPrivate->networkManager.post(analyticsPrivate->request, param.query(QUrl::EncodeUnicode).toUtf8());
+}
+
+/**
+ * NetworkAccsessManager has finished to POST a message.
+ * If POST message was successfully send then the message
+ * query should be removed from queue.
+ * SIGNAL "postMessage" will be emitted to send next message
+ * if there is any.
+ * If message couldn't be send then next try is when the
+ * timer emits its signal.
+ * @param replay    Replay to the http POST.
+ */
+void GAnalytics::postMessageFinished(QNetworkReply *replay)
+{
+    int httpStausCode = replay->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (httpStausCode < 200 || httpStausCode > 299)
+    {
+        // An error ocurred.
+        return;
+    }
+    QueryBuffer remove = analyticsPrivate->messageQueue.dequeue();
+    emit postNextMessage();
+    replay->deleteLater();
+}

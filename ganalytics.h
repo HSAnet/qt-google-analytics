@@ -2,20 +2,15 @@
 #define GANALYTICS_H
 
 #include <QObject>
-#include <QNetworkAccessManager>
-#include <QNetworkRequest>
 #include <QNetworkReply>
-#include <QCoreApplication>
 #include <QUrlQuery>
-#include <QQueue>
-#include <QTimer>
-#include <QFile>
-#include <QScreen>
-#include <QGuiApplication>
-#include <QSettings>
-#include <QUuid>
-#include <QStandardPaths>
 #include <QDateTime>
+
+struct QueryBuffer
+{
+    QUrlQuery postQuery;
+    QDateTime time;
+};
 
 class GAnalytics : public QObject
 {
@@ -24,36 +19,20 @@ public:
     explicit GAnalytics(const QString &trackingID, QObject *parent = 0);
     ~GAnalytics();
 
-private:
-    QNetworkAccessManager networkManager;
-    struct QueryBuffer { QUrlQuery postQuery; QDateTime time; };
-    QQueue<QueryBuffer> messageQueue;
-    QTimer timer;
-    QNetworkRequest request;
-    QString trackingID;
-    QString clientID;
-    QString appName;
-    QString appVersion;
-    QString language;
-    QString screenResolution;
-    QString messagesFilePath;
-    QString messagesFileName;
-    QString viewportSize;
-
 public:
     // Getter and Setter
-    void setViewportSize(const QString &viewportSize)        { this->viewportSize = viewportSize; }
-    QString getViewportSize() const                         { return viewportSize; }
-    void setLanguage(const QString &language)                { this->language = language; }
-    QString getLangugae() const                             { return language; }
-    void setTrackingID(const QString &trackingID)            { this->trackingID = trackingID; }
-    QString getTrackingID() const                           { return trackingID; }
-    void setMessagesFilePath(const QString &path)            { messagesFilePath = path; }
-    QString getMessagesFilePath() const                     { return messagesFilePath; }
-    void setMessagesFileName(const QString &name)            { messagesFileName = name; }
-    QString getMessagesFileName() const                     { return messagesFileName; }
-    void setTimerIntervall(const int seconds)               { timer.setInterval(seconds * 1000); }
-    int getTimerIntervall() const                           { return timer.interval() / 1000; }
+    void setViewportSize(const QString &viewportSize);
+    QString getViewportSize() const;
+    void setLanguage(const QString &language);
+    QString getLangugae() const;
+    void setTrackingID(const QString &trackingID);
+    QString getTrackingID() const;
+    void setMessagesFilePath(const QString &path);
+    QString getMessagesFilePath() const;
+    void setMessagesFileName(const QString &name);
+    QString getMessagesFileName() const;
+    void setTimerIntervall(const int seconds);
+    int getTimerIntervall() const;
 
 signals:
     void postNextMessage();
@@ -70,16 +49,8 @@ public slots:
     void postMessageFinished(QNetworkReply *replay);
 
 private:
-    QUrlQuery buildStandardPostQuery(const QString &type);
-    QString getScreenResolution();
-    QString getUserAgent();
-    QString getSystemInfo();
-    void persistMessageQueue();
-    void readMessagesFromFile();
-    QString getClientID();
-    void enqueQueryWithCurrentTime(QUrlQuery &query);
-    QUrlQuery getQueryWithQueueTime(QueryBuffer &buffer);
-    QString removeNewLineSymbol(QByteArray &line);
+    class Private;
+    Private *analyticsPrivate;
 
 };
 
