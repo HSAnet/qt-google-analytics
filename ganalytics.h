@@ -7,13 +7,13 @@
 class GAnalytics : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QString viewportSize READ viewportSize() WRITE setViewportSize(QString &viewportSize) NOTIFY viewportSizeChanged())
-    Q_PROPERTY(QString language READ language() WRITE setLanguage() NOTIFY languageChanged())
-    Q_PROPERTY(QString trackingID READ trackingID() WRITE setTrackingID(QString &trackingID) NOTIFY trackingIDChanged())
-    Q_PROPERTY(QString messagesFilePath READ messagesFilePath() WRITE setMessagesFilePath(QString &path) NOTIFY messagesFilePathChanged())
-    Q_PROPERTY(QString messagesFileName READ messagesFileName() WRITE setMessagesFileName(QString &name) NOTIFY messagesFileNameChanged())
-    Q_PROPERTY(int sendInterval READ sendInterval() WRITE setSendInterval(int mseconds) NOTIFY sendIntervalChanged())
-    Q_PROPERTY(bool isSending READ statusSending() NOTIFY statusSendingChanged())
+    Q_PROPERTY(QString viewportSize READ viewportSize WRITE setViewportSize NOTIFY viewportSizeChanged)
+    Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
+    Q_PROPERTY(QString trackingID READ trackingID WRITE setTrackingID NOTIFY trackingIDChanged)
+    Q_PROPERTY(QString messagesFilePath READ messagesFilePath WRITE setMessagesFilePath NOTIFY messagesFilePathChanged)
+    Q_PROPERTY(QString messagesFileName READ messagesFileName WRITE setMessagesFileName NOTIFY messagesFileNameChanged)
+    Q_PROPERTY(int sendInterval READ sendInterval WRITE setSendInterval NOTIFY sendIntervalChanged)
+    Q_PROPERTY(bool isSending READ statusSending NOTIFY statusSendingChanged)
 
 public:
     explicit GAnalytics(const QString &trackingID, QObject *parent = 0);
@@ -34,8 +34,6 @@ public:
     void setSendInterval(const int mseconds);
     int sendInterval() const;
     bool statusSending() const;
-    QList<QString> dataList() const;
-    void setDataList(QList<QString> dataList);
 
 signals:
     void viewportSizeChanged();
@@ -45,8 +43,6 @@ signals:
     void messagesFileNameChanged();
     void sendIntervalChanged();
     void statusSendingChanged();
-    // wrong place.
-    void postNextMessage();
 
 public slots:
     void sendAppview(const QString screenName = QString());
@@ -56,17 +52,17 @@ public slots:
                    const QVariant value = QVariant());
     void sendException(const QString &exceptionDescription, const bool exceptionFatal = true);
     void endSession();
-    // wrong place.
-    void postMessage();
-    void postMessageFinished(QNetworkReply *reply);
 
 private:
     class Private;
     Private *d;
 
+    friend QDataStream& operator<<(QDataStream &outStream, const GAnalytics &analytics);
+    friend QDataStream& operator>>(QDataStream &inStream, GAnalytics &analytics);
+
 };
 
 QDataStream& operator<<(QDataStream &outStream, const GAnalytics &analytics);
-QDataStream& operator >>(QDataStream &inStream, GAnalytics &analytics);
+QDataStream& operator>>(QDataStream &inStream, GAnalytics &analytics);
 
 #endif // GANALYTICS_H

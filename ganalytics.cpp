@@ -24,11 +24,11 @@ struct QueryBuffer
  * Class Private
  * Private members and functions.
  */
-class GAnalytics::Private
+class GAnalytics::Private : public QObject
 {
-
+    Q_OBJECT
 public:
-    explicit Private(QObject *parent = 0);
+    explicit Private(GAnalytics *parent = 0);
     ~Private();
 
     QNetworkAccessManager networkManager;
@@ -46,6 +46,9 @@ public:
     QString viewportSize;
     bool isSending;
 
+private:
+    GAnalytics *q;
+
 public:
     QUrlQuery buildStandardPostQuery(const QString &type);
     QString getScreenResolution();
@@ -57,6 +60,14 @@ public:
     void enqueQueryWithCurrentTime(const QUrlQuery &query);
     QUrlQuery queryWithQueueTime(QueryBuffer &buffer);
     QString removeNewLineSymbol(QByteArray &line);
+    void setIsSending(bool doSend);
+
+signals:
+    void postNextMessage();
+
+public slots:
+    void postMessage();
+    void postMessageFinished(QNetworkReply *reply);
 
 };
 
@@ -65,21 +76,26 @@ public:
  * Constructs an object of class Private.
  * @param parent
  */
-GAnalytics::Private::Private(QObject *parent) :
+GAnalytics::Private::Private(GAnalytics *parent) :
+    QObject(parent),
     request(QUrl("http://www.google-analytics.com/collect")),
     messagesFileName(".postMassages"),
     networkManager(parent),
-    timer(parent)
+    timer(parent),
+    q(parent)
 {
     messagesFilePath = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
     clientID = getClientID();
     language = QLocale::system().name().toLower().replace("_", "-");
     screenResolution = getScreenResolution();
-    //readMessagesFromFile();
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
     request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
     appName = qApp->applicationName();
     appVersion = qApp->applicationVersion();
+    connect(&networkManager, SIGNAL(finished(QNetworkReply*)), this, SLOT(postMessageFinished(QNetworkReply*)));
+    connect(this, SIGNAL(postNextMessage()), this, SLOT(postMessage()));
+    timer.start(30000);
+    connect(&timer, SIGNAL(timeout()), this, SLOT(postMessage()));
 }
 
 /**
@@ -135,7 +151,7 @@ QString GAnalytics::Private::getUserAgent()
     QString locale = QLocale::system().name();
     QString system = getSystemInfo();
 
-    return appName + "/" + appVersion + " (" + system + "; " + locale + ") GAnalytics/1.0 (Qt/" QT_VERSION_STR ")";
+    return QString("%1/%2 (%3; %4) GAnalytics/1.0 (Qt/%5)").arg(appName).arg(appVersion).arg(system).arg(locale).arg(QT_VERSION_STR);
 }
 
 
@@ -392,6 +408,13 @@ QString GAnalytics::Private::removeNewLineSymbol(QByteArray &line)
     return QString(line);
 }
 
+void GAnalytics::Private::setIsSending(bool doSend)
+{
+    if (isSending != doSend)
+        emit q->statusSendingChanged();
+    isSending = doSend;
+}
+
 
 /**
  * CONSTRUCTOR  GAnalytics
@@ -407,10 +430,6 @@ GAnalytics::GAnalytics(const QString &trackingID, QObject *parent) :
     d(new Private(this))
 {
     setTrackingID(trackingID);
-    connect(&(d->networkManager), SIGNAL(finished(QNetworkReply*)), this, SLOT(postMessageFinished(QNetworkReply*)));
-    connect(this, SIGNAL(postNextMessage()), this, SLOT(postMessage()));
-    d->timer.start(30000);
-    connect(&(d->timer), SIGNAL(timeout()), this, SLOT(postMessage()));
 }
 
 /**
@@ -495,16 +514,6 @@ int GAnalytics::sendInterval() const
 bool GAnalytics::statusSending() const
 {
     return d->isSending;
-}
-
-QList<QString> GAnalytics::dataList() const
-{
-    return d->persistMessageQueue();
-}
-
-void GAnalytics::setDataList(QList<QString> dataList)
-{
-    d->readMessagesFromFile(dataList);
 }
 
 /**
@@ -601,30 +610,27 @@ void GAnalytics::endSession()
  * The message POST is asyncroniously when the server
  * answered a signal will be emitted.
  */
-void GAnalytics::postMessage()
+void GAnalytics::Private::postMessage()
 {
-    if (d->messageQueue.isEmpty())
+    if (messageQueue.isEmpty())
     {
-        if(d->isSending)
-            emit statusSendingChanged();
-        d->isSending = false;
+        setIsSending(false);
         return;
     }
     else
     {
-        d->isSending = true;
-        emit statusSendingChanged();
+        setIsSending(true);
     }
     QString connection = "close";
-    if (d->messageQueue.count() > 1)
+    if (messageQueue.count() > 1)
     {
         connection = "keep-alive";
     }
-    QueryBuffer buffer = d->messageQueue.head();
-    QUrlQuery param = d->queryWithQueueTime(buffer);
-    d->request.setRawHeader("Connection", connection.toUtf8());
-    d->request.setHeader(QNetworkRequest::ContentLengthHeader, param.toString().length());
-    d->networkManager.post(d->request, param.query(QUrl::EncodeUnicode).toUtf8());
+    QueryBuffer buffer = messageQueue.head();
+    QUrlQuery param = queryWithQueueTime(buffer);
+    request.setRawHeader("Connection", connection.toUtf8());
+    request.setHeader(QNetworkRequest::ContentLengthHeader, param.toString().length());
+    networkManager.post(request, param.query(QUrl::EncodeUnicode).toUtf8());
 }
 
 /**
@@ -637,17 +643,16 @@ void GAnalytics::postMessage()
  * timer emits its signal.
  * @param replay    Replay to the http POST.
  */
-void GAnalytics::postMessageFinished(QNetworkReply *reply)
+void GAnalytics::Private::postMessageFinished(QNetworkReply *reply)
 {
     int httpStausCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (httpStausCode < 200 || httpStausCode > 299)
     {
         // An error ocurred.
-        d->isSending = false;
-        emit statusSendingChanged();
+        setIsSending(false);
         return;
     }
-    QueryBuffer remove = d->messageQueue.dequeue();
+    QueryBuffer remove = messageQueue.dequeue();
     emit postNextMessage();
     reply->deleteLater();
 }
@@ -661,7 +666,7 @@ void GAnalytics::postMessageFinished(QNetworkReply *reply)
  */
 QDataStream &operator<<(QDataStream &outStream, const GAnalytics &analytics)
 {
-    outStream << analytics.dataList();
+    outStream << analytics.d->persistMessageQueue();
 }
 
 
@@ -675,5 +680,7 @@ QDataStream &operator >>(QDataStream &inStream, GAnalytics &analytics)
 {
     QList<QString> dataList;
     inStream >> dataList;
-    analytics.setDataList(dataList);
+    analytics.d->readMessagesFromFile(dataList);
 }
+
+#include "ganalytics.moc"
