@@ -11,6 +11,13 @@
 #include <QNetworkRequest>
 
 
+struct QueryBuffer
+{
+    QUrlQuery postQuery;
+    QDateTime time;
+};
+
+
 /**
  * Class Private
  * Private members and functions.
@@ -393,13 +400,13 @@ QString GAnalytics::Private::removeNewLineSymbol(QByteArray &line)
  */
 GAnalytics::GAnalytics(const QString &trackingID, QObject *parent) :
     QObject(parent),
-    analyticsPrivate(new Private(this))
+    d(new Private(this))
 {
     setTrackingID(trackingID);
-    connect(analyticsPrivate->getNetworkManager(), SIGNAL(finished(QNetworkReply*)), this, SLOT(postMessageFinished(QNetworkReply*)));
+    connect(d->getNetworkManager(), SIGNAL(finished(QNetworkReply*)), this, SLOT(postMessageFinished(QNetworkReply*)));
     connect(this, SIGNAL(postNextMessage()), this, SLOT(postMessage()));
-    analyticsPrivate->timer.start(30000);
-    connect(analyticsPrivate->getTimer(), SIGNAL(timeout()), this, SLOT(postMessage()));
+    d->timer.start(30000);
+    connect(d->getTimer(), SIGNAL(timeout()), this, SLOT(postMessage()));
 }
 
 /**
@@ -407,72 +414,72 @@ GAnalytics::GAnalytics(const QString &trackingID, QObject *parent) :
  */
 GAnalytics::~GAnalytics()
 {
-    if (! analyticsPrivate->messageQueue.isEmpty())
+    if (! d->messageQueue.isEmpty())
     {
-        analyticsPrivate->persistMessageQueue();
+        d->persistMessageQueue();
     }
-    delete analyticsPrivate;
+    delete d;
 }
 
 // SETTER and GETTER
 void GAnalytics::setViewportSize(const QString &viewportSize)
 {
-    analyticsPrivate->viewportSize = viewportSize;
+    d->viewportSize = viewportSize;
 }
 
-QString GAnalytics::getViewportSize() const
+QString GAnalytics::viewportSize() const
 {
-    return analyticsPrivate->viewportSize;
+    return d->viewportSize;
 }
 
 void GAnalytics::setLanguage(const QString &language)
 {
-    analyticsPrivate->language = language;
+    d->language = language;
 }
 
-QString GAnalytics::getLangugae() const
+QString GAnalytics::langugae() const
 {
-    return analyticsPrivate->language;
+    return d->language;
 }
 
 void GAnalytics::setTrackingID(const QString &trackingID)
 {
-    analyticsPrivate->trackingID = trackingID;
+    d->trackingID = trackingID;
 }
 
-QString GAnalytics::getTrackingID() const
+QString GAnalytics::trackingID() const
 {
-    return analyticsPrivate->trackingID;
+    return d->trackingID;
 }
 
 void GAnalytics::setMessagesFilePath(const QString &path)
 {
-    analyticsPrivate->messagesFileName = path;
+    d->messagesFileName = path;
 }
 
-QString GAnalytics::getMessagesFilePath() const
+QString GAnalytics::messagesFilePath() const
 {
-    return analyticsPrivate->messagesFilePath;
+    return d->messagesFilePath;
 }
 
 void GAnalytics::setMessagesFileName(const QString &name)
 {
-    analyticsPrivate->messagesFileName = name;
+    d->messagesFileName = name;
 }
 
-QString GAnalytics::getMessagesFileName() const
+QString GAnalytics::messagesFileName() const
 {
-    return analyticsPrivate->messagesFileName;
+    return d->messagesFileName;
 }
 
-void GAnalytics::setTimerIntervall(const int seconds)
+void GAnalytics::setTimerIntervall(const int mseconds)
 {
-    analyticsPrivate->timer.setInterval(seconds * 1000);
+    d->timer.setInterval(mseconds);
 }
 
-int GAnalytics::getTimerIntervall() const
+int GAnalytics::timerIntervall() const
 {
-    return (analyticsPrivate->timer.interval() / 1000);
+    return (d->timer.interval());
 }
 
 /**
@@ -486,15 +493,15 @@ int GAnalytics::getTimerIntervall() const
  */
 void GAnalytics::sendAppview(const QString screenName)
 {
-    QUrlQuery query = analyticsPrivate->buildStandardPostQuery("appview");
+    QUrlQuery query = d->buildStandardPostQuery("appview");
     if (! screenName.isEmpty())
     {
         query.addQueryItem("cd", screenName);
     }
-    query.addQueryItem("an", analyticsPrivate->appName);
-    query.addQueryItem("av", analyticsPrivate->appVersion);
+    query.addQueryItem("an", d->appName);
+    query.addQueryItem("av", d->appVersion);
 
-    analyticsPrivate->enqueQueryWithCurrentTime(query);
+    d->enqueQueryWithCurrentTime(query);
 }
 
 /**
@@ -506,21 +513,21 @@ void GAnalytics::sendAppview(const QString screenName)
  * @param eventLabel
  * @param eventValue
  */
-void GAnalytics::sendEvent(const QString eventCategory, const QString eventAction, const QString eventLabel, const QVariant eventValue)
+void GAnalytics::sendEvent(const QString category, const QString action, const QString label, const QVariant value)
 {
-    QUrlQuery query = analyticsPrivate->buildStandardPostQuery("event");
-    query.addQueryItem("an", analyticsPrivate->appName);
-    query.addQueryItem("av", analyticsPrivate->appVersion);
-    if (! eventCategory.isEmpty())
-        query.addQueryItem("ec", eventCategory);
-    if (! eventAction.isEmpty())
-        query.addQueryItem("ea", eventAction);
-    if (! eventLabel.isEmpty())
-        query.addQueryItem("el", eventLabel);
-    if (eventValue.isValid())
-        query.addQueryItem("ev", eventValue.toString());
+    QUrlQuery query = d->buildStandardPostQuery("event");
+    query.addQueryItem("an", d->appName);
+    query.addQueryItem("av", d->appVersion);
+    if (! category.isEmpty())
+        query.addQueryItem("ec", category);
+    if (! action.isEmpty())
+        query.addQueryItem("ea", action);
+    if (! label.isEmpty())
+        query.addQueryItem("el", label);
+    if (value.isValid())
+        query.addQueryItem("ev", value.toString());
 
-    analyticsPrivate->enqueQueryWithCurrentTime(query);
+    d->enqueQueryWithCurrentTime(query);
 }
 
 /**
@@ -532,7 +539,7 @@ void GAnalytics::sendEvent(const QString eventCategory, const QString eventActio
  */
 void GAnalytics::sendException(const QString &exceptionDescription, const bool exceptionFatal)
 {
-    QUrlQuery query = analyticsPrivate->buildStandardPostQuery("exception");
+    QUrlQuery query = d->buildStandardPostQuery("exception");
     query.addQueryItem("exd", exceptionDescription);
     if (exceptionFatal)
     {
@@ -543,7 +550,7 @@ void GAnalytics::sendException(const QString &exceptionDescription, const bool e
         query.addQueryItem("exf", "0");
     }
 
-    analyticsPrivate->enqueQueryWithCurrentTime(query);
+    d->enqueQueryWithCurrentTime(query);
 }
 
 /**
@@ -553,10 +560,10 @@ void GAnalytics::sendException(const QString &exceptionDescription, const bool e
  */
 void GAnalytics::endSession()
 {
-    QUrlQuery query = analyticsPrivate->buildStandardPostQuery("event");
+    QUrlQuery query = d->buildStandardPostQuery("event");
     query.addQueryItem("sc", "end");
 
-    analyticsPrivate->enqueQueryWithCurrentTime(query);
+    d->enqueQueryWithCurrentTime(query);
 }
 
 /**
@@ -571,20 +578,20 @@ void GAnalytics::endSession()
  */
 void GAnalytics::postMessage()
 {
-    if (analyticsPrivate->messageQueue.isEmpty())
+    if (d->messageQueue.isEmpty())
     {
         return;
     }
     QString connection = "close";
-    if (analyticsPrivate->messageQueue.count() > 1)
+    if (d->messageQueue.count() > 1)
     {
         connection = "keep-alive";
     }
-    QueryBuffer buffer = analyticsPrivate->messageQueue.head();
-    QUrlQuery param = analyticsPrivate->getQueryWithQueueTime(buffer);
-    analyticsPrivate->request.setRawHeader("Connection", connection.toUtf8());
-    analyticsPrivate->request.setHeader(QNetworkRequest::ContentLengthHeader, param.toString().length());
-    analyticsPrivate->networkManager.post(analyticsPrivate->request, param.query(QUrl::EncodeUnicode).toUtf8());
+    QueryBuffer buffer = d->messageQueue.head();
+    QUrlQuery param = d->getQueryWithQueueTime(buffer);
+    d->request.setRawHeader("Connection", connection.toUtf8());
+    d->request.setHeader(QNetworkRequest::ContentLengthHeader, param.toString().length());
+    d->networkManager.post(d->request, param.query(QUrl::EncodeUnicode).toUtf8());
 }
 
 /**
@@ -597,15 +604,15 @@ void GAnalytics::postMessage()
  * timer emits its signal.
  * @param replay    Replay to the http POST.
  */
-void GAnalytics::postMessageFinished(QNetworkReply *replay)
+void GAnalytics::postMessageFinished(QNetworkReply *reply)
 {
-    int httpStausCode = replay->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    int httpStausCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (httpStausCode < 200 || httpStausCode > 299)
     {
         // An error ocurred.
         return;
     }
-    QueryBuffer remove = analyticsPrivate->messageQueue.dequeue();
+    QueryBuffer remove = d->messageQueue.dequeue();
     emit postNextMessage();
-    replay->deleteLater();
+    reply->deleteLater();
 }
