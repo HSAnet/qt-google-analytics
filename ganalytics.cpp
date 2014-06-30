@@ -57,8 +57,6 @@ public:
     void enqueQueryWithCurrentTime(const QUrlQuery &query);
     QUrlQuery queryWithQueueTime(QueryBuffer &buffer);
     QString removeNewLineSymbol(QByteArray &line);
-    QNetworkAccessManager *getNetworkManager()                  { return &networkManager; }
-    QTimer *getTimer()                                          { return &timer; }
 
 };
 
@@ -306,7 +304,7 @@ void GAnalytics::Private::persistMessageQueue()
         file.write("\n");       // new line
         QString dateTime = buffer.time.toString();
         file.write(dateTime.toUtf8());
-        file.write("\n");
+        file.write("\n");       // new line
     }
     file.close();
 }
@@ -423,10 +421,10 @@ GAnalytics::GAnalytics(const QString &trackingID, QObject *parent) :
     d(new Private(this))
 {
     setTrackingID(trackingID);
-    connect(d->getNetworkManager(), SIGNAL(finished(QNetworkReply*)), this, SLOT(postMessageFinished(QNetworkReply*)));
+    connect(&(d->networkManager), SIGNAL(finished(QNetworkReply*)), this, SLOT(postMessageFinished(QNetworkReply*)));
     connect(this, SIGNAL(postNextMessage()), this, SLOT(postMessage()));
     d->timer.start(30000);
-    connect(d->getTimer(), SIGNAL(timeout()), this, SLOT(postMessage()));
+    connect(&(d->timer), SIGNAL(timeout()), this, SLOT(postMessage()));
 }
 
 /**
