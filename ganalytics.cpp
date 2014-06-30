@@ -445,6 +445,7 @@ GAnalytics::~GAnalytics()
 void GAnalytics::setViewportSize(const QString &viewportSize)
 {
     d->viewportSize = viewportSize;
+    emit viewportSizeChanged();
 }
 
 QString GAnalytics::viewportSize() const
@@ -455,9 +456,10 @@ QString GAnalytics::viewportSize() const
 void GAnalytics::setLanguage(const QString &language)
 {
     d->language = language;
+    emit languageChanged();
 }
 
-QString GAnalytics::langugae() const
+QString GAnalytics::language() const
 {
     return d->language;
 }
@@ -465,6 +467,7 @@ QString GAnalytics::langugae() const
 void GAnalytics::setTrackingID(const QString &trackingID)
 {
     d->trackingID = trackingID;
+    emit trackingIDChanged();
 }
 
 QString GAnalytics::trackingID() const
@@ -475,6 +478,7 @@ QString GAnalytics::trackingID() const
 void GAnalytics::setMessagesFilePath(const QString &path)
 {
     d->messagesFileName = path;
+    emit messagesFilePathChanged();
 }
 
 QString GAnalytics::messagesFilePath() const
@@ -485,6 +489,7 @@ QString GAnalytics::messagesFilePath() const
 void GAnalytics::setMessagesFileName(const QString &name)
 {
     d->messagesFileName = name;
+    emit messagesFileNameChanged();
 }
 
 QString GAnalytics::messagesFileName() const
@@ -492,17 +497,18 @@ QString GAnalytics::messagesFileName() const
     return d->messagesFileName;
 }
 
-void GAnalytics::setTimerIntervall(const int mseconds)
+void GAnalytics::setSendInterval(const int mseconds)
 {
     d->timer.setInterval(mseconds);
+    emit sendIntervalChanged();
 }
 
-int GAnalytics::timerIntervall() const
+int GAnalytics::sendInterval() const
 {
     return (d->timer.interval());
 }
 
-bool GAnalytics::isSendingMessages() const
+bool GAnalytics::statusSending() const
 {
     return d->isSending;
 }
@@ -605,12 +611,15 @@ void GAnalytics::postMessage()
 {
     if (d->messageQueue.isEmpty())
     {
+        if(d->isSending)
+            emit statusSendingChanged();
         d->isSending = false;
         return;
     }
     else
     {
         d->isSending = true;
+        emit statusSendingChanged();
     }
     QString connection = "close";
     if (d->messageQueue.count() > 1)
@@ -641,6 +650,7 @@ void GAnalytics::postMessageFinished(QNetworkReply *reply)
     {
         // An error ocurred.
         d->isSending = false;
+        emit statusSendingChanged();
         return;
     }
     QueryBuffer remove = d->messageQueue.dequeue();
