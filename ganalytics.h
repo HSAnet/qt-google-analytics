@@ -34,6 +34,8 @@ public:
     void setSendInterval(const int mseconds);
     int sendInterval() const;
     bool statusSending() const;
+    QList<QString> dataList() const;
+    void setDataList(QList<QString> dataList);
 
 signals:
     void viewportSizeChanged();
@@ -63,5 +65,8 @@ private:
     Private *d;
 
 };
+
+QDataStream& operator<<(QDataStream &outStream, const GAnalytics &analytics);
+QDataStream& operator >>(QDataStream &inStream, GAnalytics &analytics);
 
 #endif // GANALYTICS_H

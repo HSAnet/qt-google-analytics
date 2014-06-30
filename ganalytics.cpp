@@ -51,8 +51,8 @@ public:
     QString getScreenResolution();
     QString getUserAgent();
     QString getSystemInfo();
-    void persistMessageQueue();
-    void readMessagesFromFile();
+    QList<QString> persistMessageQueue();
+    void readMessagesFromFile(QList<QString> dataList);
     QString getClientID();
     void enqueQueryWithCurrentTime(const QUrlQuery &query);
     QUrlQuery queryWithQueueTime(QueryBuffer &buffer);
@@ -75,7 +75,7 @@ GAnalytics::Private::Private(QObject *parent) :
     clientID = getClientID();
     language = QLocale::system().name().toLower().replace("_", "-");
     screenResolution = getScreenResolution();
-    readMessagesFromFile();
+    //readMessagesFromFile();
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
     request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
     appName = qApp->applicationName();
@@ -285,56 +285,42 @@ QString GAnalytics::Private::getSystemInfo()
 
 
 /**
- * Store the content of the message queue to a file.
- * Messages which could not be send are stored into
- * a file. They can be read when application starts
- * again.
- * Queue time information is dropped here.
+ * The message queue contains a list of QueryBuffer object.
+ * QueryBuffer holds a QUrlQuery object and a QDateTime object.
+ * These both object are freed from the buffer object and
+ * inserted as QString objects in a QList.
+ * @return dataList     The list with concartinated queue data.
  */
-void GAnalytics::Private::persistMessageQueue()
+QList<QString> GAnalytics::Private::persistMessageQueue()
 {
-    QString filePath(messagesFilePath + messagesFileName);
-    QFile file(filePath);
-    file.open(QIODevice::WriteOnly);
-    while (! messageQueue.isEmpty())
-    {
-        QueryBuffer buffer = messageQueue.dequeue();
-        QString queryString = buffer.postQuery.query();
-        file.write(queryString.toUtf8());
-        file.write("\n");       // new line
-        QString dateTime = buffer.time.toString();
-        file.write(dateTime.toUtf8());
-        file.write("\n");       // new line
+    QList<QString> dataList;
+    foreach (QueryBuffer buffer, messageQueue) {
+        dataList << buffer.postQuery.toString();
+        dataList << buffer.time.toString();
     }
-    file.close();
+
+    return dataList;
 }
 
 /**
  * Reads persistent messages from a file.
- * Messages will get a new Queue time here.
- * Time measuring of queue time starts again.
+ * Gets all message data as a QList<QString>.
+ * Two lines in the list build a QueryBuffer object.
  */
-void GAnalytics::Private::readMessagesFromFile()
+void GAnalytics::Private::readMessagesFromFile(QList<QString> dataList)
 {
-    QString filePath(messagesFilePath + messagesFileName);
-    if (! QFile::exists(filePath))
+    while (! dataList.isEmpty())
     {
-        return;
-    }
-    QFile file(filePath);
-    file.open(QIODevice::ReadWrite);
-    while (! file.atEnd())
-    {
+        QString queryString = dataList.takeFirst();
+        QString dateString = dataList.takeFirst();
+        QUrlQuery query;
+        query.setQuery(queryString);
+        QDateTime dateTime = QDateTime::fromString(dateString);
         QueryBuffer buffer;
-        QByteArray line = file.readLine();
-        QString queryString = removeNewLineSymbol(line);
-        buffer.postQuery = QUrlQuery(queryString);
-        line = file.readLine();
-        QString dateTimeString = removeNewLineSymbol(line);
-        buffer.time = QDateTime::fromString(dateTimeString);
+        buffer.postQuery = query;
+        buffer.time = dateTime;
+        messageQueue.enqueue(buffer);
     }
-    file.close();
-    file.remove();
 }
 
 
@@ -511,6 +497,16 @@ bool GAnalytics::statusSending() const
     return d->isSending;
 }
 
+QList<QString> GAnalytics::dataList() const
+{
+    return d->persistMessageQueue();
+}
+
+void GAnalytics::setDataList(QList<QString> dataList)
+{
+    d->readMessagesFromFile(dataList);
+}
+
 /**
  * SentAppview is called when the user changed the applications view.
  * These action of the user should be noticed and reported. Therefore
@@ -654,4 +650,30 @@ void GAnalytics::postMessageFinished(QNetworkReply *reply)
     QueryBuffer remove = d->messageQueue.dequeue();
     emit postNextMessage();
     reply->deleteLater();
+}
+
+
+/**
+ * Qut stream to persist class GAnalytics.
+ * @param outStream
+ * @param analytics
+ * @return
+ */
+QDataStream &operator<<(QDataStream &outStream, const GAnalytics &analytics)
+{
+    outStream << analytics.dataList();
+}
+
+
+/**
+ * In stream to read GAnalytics from file.
+ * @param inStream
+ * @param analytics
+ * @return
+ */
+QDataStream &operator >>(QDataStream &inStream, GAnalytics &analytics)
+{
+    QList<QString> dataList;
+    inStream >> dataList;
+    analytics.setDataList(dataList);
 }
