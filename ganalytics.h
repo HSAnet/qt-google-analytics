@@ -3,8 +3,6 @@
 
 #include <QObject>
 #include <QNetworkReply>
-#include <QUrlQuery>
-#include <QDateTime>
 
 class GAnalytics : public QObject
 {
@@ -27,6 +25,7 @@ public:
     QString messagesFileName() const;
     void setTimerIntervall(const int mseconds);
     int timerIntervall() const;
+    bool isSendingMessages() const;
 
 signals:
     void postNextMessage();

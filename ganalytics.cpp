@@ -9,6 +9,8 @@
 #include <QStandardPaths>
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
+#include <QUrlQuery>
+#include <QDateTime>
 
 
 struct QueryBuffer
@@ -26,22 +28,8 @@ class GAnalytics::Private
 {
 
 public:
-    Private(QObject *parent = 0) :
-        request(QUrl("http://www.google-analytics.com/collect")),
-        messagesFileName(".postMassages"),
-        networkManager(parent),
-        timer(parent)
-    {
-        messagesFilePath = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
-        clientID = getClientID();
-        language = QLocale::system().name().toLower().replace("_", "-");
-        screenResolution = getScreenResolution();
-        readMessagesFromFile();
-        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
-        request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
-        appName = qApp->applicationName();
-        appVersion = qApp->applicationVersion();
-    }
+    explicit Private(QObject *parent = 0);
+    ~Private();
 
     QNetworkAccessManager networkManager;
     QQueue<QueryBuffer> messageQueue;
@@ -56,6 +44,7 @@ public:
     QString messagesFilePath;
     QString messagesFileName;
     QString viewportSize;
+    bool isSending;
 
 public:
     QUrlQuery buildStandardPostQuery(const QString &type);
@@ -66,12 +55,43 @@ public:
     void readMessagesFromFile();
     QString getClientID();
     void enqueQueryWithCurrentTime(QUrlQuery &query);
-    QUrlQuery getQueryWithQueueTime(QueryBuffer &buffer);
+    QUrlQuery queryWithQueueTime(QueryBuffer &buffer);
     QString removeNewLineSymbol(QByteArray &line);
     QNetworkAccessManager *getNetworkManager()                  { return &networkManager; }
     QTimer *getTimer()                                          { return &timer; }
 
 };
+
+/**
+ * Constructor
+ * Constructs an object of class Private.
+ * @param parent
+ */
+GAnalytics::Private::Private(QObject *parent) :
+    request(QUrl("http://www.google-analytics.com/collect")),
+    messagesFileName(".postMassages"),
+    networkManager(parent),
+    timer(parent)
+{
+    messagesFilePath = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
+    clientID = getClientID();
+    language = QLocale::system().name().toLower().replace("_", "-");
+    screenResolution = getScreenResolution();
+    readMessagesFromFile();
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+    request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
+    appName = qApp->applicationName();
+    appVersion = qApp->applicationVersion();
+}
+
+/**
+ * Destructor
+ * Delete an object of class Private.
+ */
+GAnalytics::Private::~Private()
+{
+
+}
 
 /**
  * Build the POST query. Adds all parameter to the query
@@ -365,7 +385,7 @@ void GAnalytics::Private::enqueQueryWithCurrentTime(QUrlQuery &query)
  * @param buffer
  * @return query        The query with meantime added.
 */
-QUrlQuery GAnalytics::Private::getQueryWithQueueTime(QueryBuffer &buffer)
+QUrlQuery GAnalytics::Private::queryWithQueueTime(QueryBuffer &buffer)
 {
     QDateTime now = QDateTime::currentDateTime();
     int queueTime = buffer.time.msecsTo(now);
@@ -482,6 +502,11 @@ int GAnalytics::timerIntervall() const
     return (d->timer.interval());
 }
 
+bool GAnalytics::isSendingMessages() const
+{
+    return d->isSending;
+}
+
 /**
  * SentAppview is called when the user changed the applications view.
  * These action of the user should be noticed and reported. Therefore
@@ -580,7 +605,12 @@ void GAnalytics::postMessage()
 {
     if (d->messageQueue.isEmpty())
     {
+        d->isSending = false;
         return;
+    }
+    else
+    {
+        d->isSending = true;
     }
     QString connection = "close";
     if (d->messageQueue.count() > 1)
@@ -588,7 +618,7 @@ void GAnalytics::postMessage()
         connection = "keep-alive";
     }
     QueryBuffer buffer = d->messageQueue.head();
-    QUrlQuery param = d->getQueryWithQueueTime(buffer);
+    QUrlQuery param = d->queryWithQueueTime(buffer);
     d->request.setRawHeader("Connection", connection.toUtf8());
     d->request.setHeader(QNetworkRequest::ContentLengthHeader, param.toString().length());
     d->networkManager.post(d->request, param.query(QUrl::EncodeUnicode).toUtf8());
@@ -610,6 +640,7 @@ void GAnalytics::postMessageFinished(QNetworkReply *reply)
     if (httpStausCode < 200 || httpStausCode > 299)
     {
         // An error ocurred.
+        d->isSending = false;
         return;
     }
     QueryBuffer remove = d->messageQueue.dequeue();
