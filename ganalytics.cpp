@@ -54,7 +54,7 @@ public:
     void persistMessageQueue();
     void readMessagesFromFile();
     QString getClientID();
-    void enqueQueryWithCurrentTime(QUrlQuery &query);
+    void enqueQueryWithCurrentTime(const QUrlQuery &query);
     QUrlQuery queryWithQueueTime(QueryBuffer &buffer);
     QString removeNewLineSymbol(QByteArray &line);
     QNetworkAccessManager *getNetworkManager()                  { return &networkManager; }
@@ -368,7 +368,7 @@ QString GAnalytics::Private::getClientID()
  * will be stored in the message queue.
  * @param query
  */
-void GAnalytics::Private::enqueQueryWithCurrentTime(QUrlQuery &query)
+void GAnalytics::Private::enqueQueryWithCurrentTime(const QUrlQuery &query)
 {
     QueryBuffer buffer;
     buffer.postQuery = query;
