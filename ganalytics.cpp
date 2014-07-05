@@ -19,7 +19,6 @@ struct QueryBuffer
     QDateTime time;
 };
 
-
 /**
  * Class Private
  * Private members and functions.
@@ -45,6 +44,8 @@ public:
     QString messagesFileName;
     QString viewportSize;
     bool isSending;
+    const static int fourHours = 4 * 60 * 60 * 1000;
+    const static QString dateTimeFormat;
 
 private:
     GAnalytics *q;
@@ -58,7 +59,6 @@ public:
     void readMessagesFromFile(QList<QString> dataList);
     QString getClientID();
     void enqueQueryWithCurrentTime(const QUrlQuery &query);
-    QUrlQuery queryWithQueueTime(QueryBuffer &buffer);
     QString removeNewLineSymbol(QByteArray &line);
     void setIsSending(bool doSend);
 
@@ -70,6 +70,8 @@ public slots:
     void postMessageFinished(QNetworkReply *reply);
 
 };
+
+const QString GAnalytics::Private::dateTimeFormat  = "yyyy,MM,dd-hh:mm::ss:zzz";
 
 /**
  * Constructor
@@ -87,7 +89,7 @@ GAnalytics::Private::Private(GAnalytics *parent) :
     messagesFilePath = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
     clientID = getClientID();
     language = QLocale::system().name().toLower().replace("_", "-");
-    screenResolution = getScreenResolution();
+    //screenResolution = getScreenResolution();
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
     request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
     appName = qApp->applicationName();
@@ -312,7 +314,7 @@ QList<QString> GAnalytics::Private::persistMessageQueue()
     QList<QString> dataList;
     foreach (QueryBuffer buffer, messageQueue) {
         dataList << buffer.postQuery.toString();
-        dataList << buffer.time.toString();
+        dataList << buffer.time.toString(dateTimeFormat);
     }
 
     return dataList;
@@ -331,7 +333,7 @@ void GAnalytics::Private::readMessagesFromFile(QList<QString> dataList)
         QString dateString = dataList.takeFirst();
         QUrlQuery query;
         query.setQuery(queryString);
-        QDateTime dateTime = QDateTime::fromString(dateString);
+        QDateTime dateTime = QDateTime::fromString(dateString, dateTimeFormat);
         QueryBuffer buffer;
         buffer.postQuery = query;
         buffer.time = dateTime;
@@ -378,23 +380,6 @@ void GAnalytics::Private::enqueQueryWithCurrentTime(const QUrlQuery &query)
 }
 
 /**
- * Gets the QTime object from the QueryBuffer structure and
- * calculats the time which has been elapsed while message
- * was in queue. The meantime of buffering message in msec
- * is added to the query.
- * @param buffer
- * @return query        The query with meantime added.
-*/
-QUrlQuery GAnalytics::Private::queryWithQueueTime(QueryBuffer &buffer)
-{
-    QDateTime now = QDateTime::currentDateTime();
-    int queueTime = buffer.time.msecsTo(now);
-    buffer.postQuery.addQueryItem("qt", QString::number(queueTime));
-
-    return buffer.postQuery;
-}
-
-/**
 * Takes a QByteArray which contains a new line symbol at the end.
 * The "\n" symbol at the end will be removed.
 * @param line
@@ -408,8 +393,16 @@ QString GAnalytics::Private::removeNewLineSymbol(QByteArray &line)
     return QString(line);
 }
 
+/**
+ * Change status of class. Emit signal that status was changed.
+ * @param doSend
+ */
 void GAnalytics::Private::setIsSending(bool doSend)
 {
+    if (doSend)
+        timer.stop();
+    else
+        timer.start();
     if (isSending != doSend)
         emit q->statusSendingChanged();
     isSending = doSend;
@@ -437,10 +430,6 @@ GAnalytics::GAnalytics(const QString &trackingID, QObject *parent) :
  */
 GAnalytics::~GAnalytics()
 {
-    if (! d->messageQueue.isEmpty())
-    {
-        d->persistMessageQueue();
-    }
     delete d;
 }
 
@@ -627,10 +616,18 @@ void GAnalytics::Private::postMessage()
         connection = "keep-alive";
     }
     QueryBuffer buffer = messageQueue.head();
-    QUrlQuery param = queryWithQueueTime(buffer);
+    QDateTime sendTime = QDateTime::currentDateTime();
+    qint64 timeDiff = buffer.time.msecsTo(sendTime);
+    if(timeDiff > fourHours)
+    {
+        // to old.
+        messageQueue.dequeue();
+        emit postMessage();
+    }
+    buffer.postQuery.addQueryItem("qt", QString::number(timeDiff));
     request.setRawHeader("Connection", connection.toUtf8());
-    request.setHeader(QNetworkRequest::ContentLengthHeader, param.toString().length());
-    networkManager.post(request, param.query(QUrl::EncodeUnicode).toUtf8());
+    request.setHeader(QNetworkRequest::ContentLengthHeader, buffer.postQuery.toString().length());
+    networkManager.post(request, buffer.postQuery.query(QUrl::EncodeUnicode).toUtf8());
 }
 
 /**
