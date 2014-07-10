@@ -10,8 +10,6 @@ class GAnalytics : public QObject
     Q_PROPERTY(QString viewportSize READ viewportSize WRITE setViewportSize NOTIFY viewportSizeChanged)
     Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
     Q_PROPERTY(QString trackingID READ trackingID WRITE setTrackingID NOTIFY trackingIDChanged)
-    Q_PROPERTY(QString messagesFilePath READ messagesFilePath WRITE setMessagesFilePath NOTIFY messagesFilePathChanged)
-    Q_PROPERTY(QString messagesFileName READ messagesFileName WRITE setMessagesFileName NOTIFY messagesFileNameChanged)
     Q_PROPERTY(int sendInterval READ sendInterval WRITE setSendInterval NOTIFY sendIntervalChanged)
     Q_PROPERTY(bool isSending READ statusSending NOTIFY statusSendingChanged)
 
@@ -27,10 +25,6 @@ public:
     QString language() const;
     void setTrackingID(const QString &trackingID);
     QString trackingID() const;
-    void setMessagesFilePath(const QString &path);
-    QString messagesFilePath() const;
-    void setMessagesFileName(const QString &name);
-    QString messagesFileName() const;
     void setSendInterval(const int mseconds);
     int sendInterval() const;
     bool statusSending() const;
@@ -39,8 +33,6 @@ signals:
     void viewportSizeChanged();
     void languageChanged();
     void trackingIDChanged();
-    void messagesFilePathChanged();
-    void messagesFileNameChanged();
     void sendIntervalChanged();
     void statusSendingChanged();
 

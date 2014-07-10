@@ -1,7 +1,6 @@
 #include "ganalytics.h"
 #include <QQueue>
 #include <QTimer>
-#include <QFile>
 #include <QScreen>
 #include <QGuiApplication>
 #include <QSettings>
@@ -40,8 +39,6 @@ public:
     QString appVersion;
     QString language;
     QString screenResolution;
-    QString messagesFilePath;
-    QString messagesFileName;
     QString viewportSize;
     bool isSending;
     const static int fourHours = 4 * 60 * 60 * 1000;
@@ -81,15 +78,13 @@ const QString GAnalytics::Private::dateTimeFormat  = "yyyy,MM,dd-hh:mm::ss:zzz";
 GAnalytics::Private::Private(GAnalytics *parent) :
     QObject(parent),
     request(QUrl("http://www.google-analytics.com/collect")),
-    messagesFileName(".postMassages"),
     networkManager(parent),
     timer(parent),
     q(parent)
 {
-    messagesFilePath = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
     clientID = getClientID();
     language = QLocale::system().name().toLower().replace("_", "-");
-    //screenResolution = getScreenResolution();
+    screenResolution = getScreenResolution();
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
     request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
     appName = qApp->applicationName();
@@ -467,28 +462,6 @@ QString GAnalytics::trackingID() const
     return d->trackingID;
 }
 
-void GAnalytics::setMessagesFilePath(const QString &path)
-{
-    d->messagesFileName = path;
-    emit messagesFilePathChanged();
-}
-
-QString GAnalytics::messagesFilePath() const
-{
-    return d->messagesFilePath;
-}
-
-void GAnalytics::setMessagesFileName(const QString &name)
-{
-    d->messagesFileName = name;
-    emit messagesFileNameChanged();
-}
-
-QString GAnalytics::messagesFileName() const
-{
-    return d->messagesFileName;
-}
-
 void GAnalytics::setSendInterval(const int mseconds)
 {
     d->timer.setInterval(mseconds);
@@ -664,6 +637,8 @@ void GAnalytics::Private::postMessageFinished(QNetworkReply *reply)
 QDataStream &operator<<(QDataStream &outStream, const GAnalytics &analytics)
 {
     outStream << analytics.d->persistMessageQueue();
+
+    return outStream;
 }
 
 
@@ -678,6 +653,8 @@ QDataStream &operator >>(QDataStream &inStream, GAnalytics &analytics)
     QList<QString> dataList;
     inStream >> dataList;
     analytics.d->readMessagesFromFile(dataList);
+
+    return inStream;
 }
 
 #include "ganalytics.moc"
