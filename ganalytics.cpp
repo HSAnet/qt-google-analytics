@@ -1,4 +1,5 @@
 #include "ganalytics.h"
+
 #include <QQueue>
 #include <QTimer>
 #include <QScreen>
@@ -10,6 +11,7 @@
 #include <QNetworkRequest>
 #include <QUrlQuery>
 #include <QDateTime>
+#include <QNetworkReply>
 
 
 struct QueryBuffer
@@ -30,6 +32,7 @@ public:
     ~Private();
 
     QNetworkAccessManager networkManager;
+
     QQueue<QueryBuffer> messageQueue;
     QTimer timer;
     QNetworkRequest request;
@@ -56,7 +59,6 @@ public:
     void readMessagesFromFile(QList<QString> dataList);
     QString getClientID();
     void enqueQueryWithCurrentTime(const QUrlQuery &query);
-    QString removeNewLineSymbol(QByteArray &line);
     void setIsSending(bool doSend);
 
 signals:
@@ -65,7 +67,6 @@ signals:
 public slots:
     void postMessage();
     void postMessageFinished(QNetworkReply *reply);
-
 };
 
 const QString GAnalytics::Private::dateTimeFormat  = "yyyy,MM,dd-hh:mm::ss:zzz";
@@ -75,12 +76,10 @@ const QString GAnalytics::Private::dateTimeFormat  = "yyyy,MM,dd-hh:mm::ss:zzz";
  * Constructs an object of class Private.
  * @param parent
  */
-GAnalytics::Private::Private(GAnalytics *parent) :
-    QObject(parent),
-    request(QUrl("http://www.google-analytics.com/collect")),
-    networkManager(parent),
-    timer(parent),
-    q(parent)
+GAnalytics::Private::Private(GAnalytics *parent)
+: QObject(parent)
+, q(parent)
+, request(QUrl("http://www.google-analytics.com/collect"))
 {
     clientID = getClientID();
     language = QLocale::system().name().toLower().replace("_", "-");
@@ -101,7 +100,6 @@ GAnalytics::Private::Private(GAnalytics *parent) :
  */
 GAnalytics::Private::~Private()
 {
-
 }
 
 /**
@@ -132,7 +130,7 @@ QString GAnalytics::Private::getScreenResolution()
     QScreen *screen = QGuiApplication::primaryScreen();
     QSize size = screen->size();
 
-    return QString::number(size.width()) + "x" + QString::number(size.height());
+    return QString("%1x%2").arg(size.width()).arg(size.height());
 }
 
 
@@ -162,7 +160,8 @@ QString GAnalytics::Private::getSystemInfo()
 {
     QSysInfo::MacVersion version = QSysInfo::macVersion();
     QString os;
-    switch (version) {
+    switch (version)
+    {
     case QSysInfo::MV_9:
         os = "Macintosh; Mac OS 9";
         break;
@@ -236,9 +235,10 @@ QString GAnalytics::Private::getSystemInfo()
  */
 QString GAnalytics::Private::getSystemInfo()
 {
-    QSysInfo::WindowsVersion version = QSysInfo::windowsVersion();
+    QSysInfo::WinVersion version = QSysInfo::windowsVersion();
     QString os("Windows; ");
-    switch (version) {
+    switch (version)
+    {
     case QSysInfo::WV_95:
         os += "Win 95";
         break;
@@ -307,35 +307,14 @@ QString GAnalytics::Private::getSystemInfo()
 QList<QString> GAnalytics::Private::persistMessageQueue()
 {
     QList<QString> dataList;
-    foreach (QueryBuffer buffer, messageQueue) {
+    foreach (QueryBuffer buffer, messageQueue)
+    {
         dataList << buffer.postQuery.toString();
         dataList << buffer.time.toString(dateTimeFormat);
     }
 
     return dataList;
 }
-
-/**
- * Reads persistent messages from a file.
- * Gets all message data as a QList<QString>.
- * Two lines in the list build a QueryBuffer object.
- */
-void GAnalytics::Private::readMessagesFromFile(QList<QString> dataList)
-{
-    while (! dataList.isEmpty())
-    {
-        QString queryString = dataList.takeFirst();
-        QString dateString = dataList.takeFirst();
-        QUrlQuery query;
-        query.setQuery(queryString);
-        QDateTime dateTime = QDateTime::fromString(dateString, dateTimeFormat);
-        QueryBuffer buffer;
-        buffer.postQuery = query;
-        buffer.time = dateTime;
-        messageQueue.enqueue(buffer);
-    }
-}
-
 
 /**
  * Get the client id.
@@ -346,7 +325,7 @@ QString GAnalytics::Private::getClientID()
 {
     QSettings settings;
     QString clientID;
-    if (! settings.contains("GAnalytics-cid"))
+    if (!settings.contains("GAnalytics-cid"))
     {
         clientID = QUuid::createUuid().toString();
         settings.setValue("GAnalytics-cid", clientID);
@@ -375,20 +354,6 @@ void GAnalytics::Private::enqueQueryWithCurrentTime(const QUrlQuery &query)
 }
 
 /**
-* Takes a QByteArray which contains a new line symbol at the end.
-* The "\n" symbol at the end will be removed.
-* @param line
-* @return       Returns a QString without end line symbol.
-*/
-QString GAnalytics::Private::removeNewLineSymbol(QByteArray &line)
-{
-    int pos = line.size() - 1;
-    line = line.remove(pos, 1);
-
-    return QString(line);
-}
-
-/**
  * Change status of class. Emit signal that status was changed.
  * @param doSend
  */
@@ -398,9 +363,11 @@ void GAnalytics::Private::setIsSending(bool doSend)
         timer.stop();
     else
         timer.start();
+
+    isSending = doSend;
+
     if (isSending != doSend)
         emit q->statusSendingChanged();
-    isSending = doSend;
 }
 
 
@@ -462,9 +429,9 @@ QString GAnalytics::trackingID() const
     return d->trackingID;
 }
 
-void GAnalytics::setSendInterval(const int mseconds)
+void GAnalytics::setSendInterval(int milliseconds)
 {
-    d->timer.setInterval(mseconds);
+    d->timer.setInterval(milliseconds);
     emit sendIntervalChanged();
 }
 
@@ -473,7 +440,7 @@ int GAnalytics::sendInterval() const
     return (d->timer.interval());
 }
 
-bool GAnalytics::statusSending() const
+bool GAnalytics::isSending() const
 {
     return d->isSending;
 }

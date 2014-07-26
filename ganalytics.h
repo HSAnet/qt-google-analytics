@@ -2,7 +2,7 @@
 #define GANALYTICS_H
 
 #include <QObject>
-#include <QNetworkReply>
+#include <QVariant>
 
 class GAnalytics : public QObject
 {
@@ -11,23 +11,27 @@ class GAnalytics : public QObject
     Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
     Q_PROPERTY(QString trackingID READ trackingID WRITE setTrackingID NOTIFY trackingIDChanged)
     Q_PROPERTY(int sendInterval READ sendInterval WRITE setSendInterval NOTIFY sendIntervalChanged)
-    Q_PROPERTY(bool isSending READ statusSending NOTIFY statusSendingChanged)
+    Q_PROPERTY(bool isSending READ isSending NOTIFY statusSendingChanged)
 
 public:
     explicit GAnalytics(const QString &trackingID, QObject *parent = 0);
     ~GAnalytics();
 
 public:
-    // Getter and Setter
+    // Getter and Setters
     void setViewportSize(const QString &viewportSize);
     QString viewportSize() const;
+
     void setLanguage(const QString &language);
     QString language() const;
+
     void setTrackingID(const QString &trackingID);
     QString trackingID() const;
-    void setSendInterval(const int mseconds);
+
+    void setSendInterval(int milliseconds);
     int sendInterval() const;
-    bool statusSending() const;
+
+    bool isSending() const;
 
 signals:
     void viewportSizeChanged();
