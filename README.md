@@ -1,4 +1,4 @@
-google-analytics
+qt-google-analytics
 ================
 
-To gain information about visitors on the webseite.
+Qt classes for providing google analytics usage in a Qt/QML application.
