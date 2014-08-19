@@ -317,6 +317,27 @@ QList<QString> GAnalytics::Private::persistMessageQueue()
 }
 
 /**
+ * Reads persistent messages from a file.
+ * Gets all message data as a QList<QString>.
+ * Two lines in the list build a QueryBuffer object.
+ */
+void GAnalytics::Private::readMessagesFromFile(QList<QString> dataList)
+{
+    while (! dataList.isEmpty())
+    {
+        QString queryString = dataList.takeFirst();
+        QString dateString = dataList.takeFirst();
+        QUrlQuery query;
+        query.setQuery(queryString);
+        QDateTime dateTime = QDateTime::fromString(dateString, dateTimeFormat);
+        QueryBuffer buffer;
+        buffer.postQuery = query;
+        buffer.time = dateTime;
+        messageQueue.enqueue(buffer);
+    }
+}
+
+/**
  * Get the client id.
  * Client id once created is stored in application settings.
  * @return clientID         A string with the client id.
