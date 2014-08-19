@@ -36,6 +36,8 @@ public:
     QQueue<QueryBuffer> messageQueue;
     QTimer timer;
     QNetworkRequest request;
+    GAnalytics::LogLevel logLevel;
+
     QString trackingID;
     QString clientID;
     QString appName;
@@ -43,7 +45,9 @@ public:
     QString language;
     QString screenResolution;
     QString viewportSize;
+
     bool isSending;
+
     const static int fourHours = 4 * 60 * 60 * 1000;
     const static QString dateTimeFormat;
 
@@ -51,12 +55,16 @@ private:
     GAnalytics *q;
 
 public:
+    void logMessage(GAnalytics::LogLevel level, const QString &message);
+
     QUrlQuery buildStandardPostQuery(const QString &type);
+#ifdef QT_GUI_LIB
     QString getScreenResolution();
+#endif // QT_GUI_LIB
     QString getUserAgent();
     QString getSystemInfo();
     QList<QString> persistMessageQueue();
-    void readMessagesFromFile(QList<QString> dataList);
+    void readMessagesFromFile(const QList<QString> &dataList);
     QString getClientID();
     void enqueQueryWithCurrentTime(const QUrlQuery &query);
     void setIsSending(bool doSend);
@@ -79,6 +87,8 @@ const QString GAnalytics::Private::dateTimeFormat  = "yyyy,MM,dd-hh:mm::ss:zzz";
 GAnalytics::Private::Private(GAnalytics *parent)
 : QObject(parent)
 , q(parent)
+, logLevel(GAnalytics::Error)
+, isSending(false)
 , request(QUrl("http://www.google-analytics.com/collect"))
 {
     clientID = getClientID();
@@ -102,6 +112,14 @@ GAnalytics::Private::~Private()
 {
 }
 
+void GAnalytics::Private::logMessage(LogLevel level, const QString &message)
+{
+    if (logLevel > level)
+        return;
+
+    qDebug() << "[Analytics]" << message;
+}
+
 /**
  * Build the POST query. Adds all parameter to the query
  * which are used in every POST.
@@ -115,12 +133,17 @@ QUrlQuery GAnalytics::Private::buildStandardPostQuery(const QString &type)
     query.addQueryItem("tid", trackingID);
     query.addQueryItem("cid", clientID);
     query.addQueryItem("t", type);
+    query.addQueryItem("ul", language);
+
+#ifdef QT_GUI_LIB
     query.addQueryItem("vp", viewportSize);
     query.addQueryItem("sr", screenResolution);
-    query.addQueryItem("ul", language);
+#endif // QT_GUI_LIB
 
     return query;
 }
+
+#ifdef QT_GUI_LIB
 /**
  * Get devicese screen resolution.
  * @return      A QString like "800x600".
@@ -132,6 +155,7 @@ QString GAnalytics::Private::getScreenResolution()
 
     return QString("%1x%2").arg(size.width()).arg(size.height());
 }
+#endif // QT_GUI_LIB
 
 
 /**
@@ -321,12 +345,13 @@ QList<QString> GAnalytics::Private::persistMessageQueue()
  * Gets all message data as a QList<QString>.
  * Two lines in the list build a QueryBuffer object.
  */
-void GAnalytics::Private::readMessagesFromFile(QList<QString> dataList)
+void GAnalytics::Private::readMessagesFromFile(const QList<QString> &dataList)
 {
-    while (! dataList.isEmpty())
+    QListIterator<QString> iter(dataList);
+    while (iter.hasNext())
     {
-        QString queryString = dataList.takeFirst();
-        QString dateString = dataList.takeFirst();
+        QString queryString = iter.next();
+        QString dateString = iter.next();
         QUrlQuery query;
         query.setQuery(queryString);
         QDateTime dateTime = QDateTime::fromString(dateString, dateTimeFormat);
@@ -401,9 +426,15 @@ void GAnalytics::Private::setIsSending(bool doSend)
  * @param clientID
  * @param withGet       Determines wheather the messages are send with GET or POST.
  */
-GAnalytics::GAnalytics(const QString &trackingID, QObject *parent) :
-    QObject(parent),
-    d(new Private(this))
+GAnalytics::GAnalytics(QObject *parent)
+: QObject(parent)
+, d(new Private(this))
+{
+}
+
+GAnalytics::GAnalytics(const QString &trackingID, QObject *parent)
+: QObject(parent)
+, d(new Private(this))
 {
     setTrackingID(trackingID);
 }
@@ -416,11 +447,28 @@ GAnalytics::~GAnalytics()
     delete d;
 }
 
+void GAnalytics::setLogLevel(GAnalytics::LogLevel logLevel)
+{
+    if (d->logLevel != logLevel)
+    {
+        d->logLevel = logLevel;
+        emit logLevelChanged();
+    }
+}
+
+GAnalytics::LogLevel GAnalytics::logLevel() const
+{
+    return d->logLevel;
+}
+
 // SETTER and GETTER
 void GAnalytics::setViewportSize(const QString &viewportSize)
 {
-    d->viewportSize = viewportSize;
-    emit viewportSizeChanged();
+    if (d->viewportSize != viewportSize)
+    {
+        d->viewportSize = viewportSize;
+        emit viewportSizeChanged();
+    }
 }
 
 QString GAnalytics::viewportSize() const
@@ -430,8 +478,11 @@ QString GAnalytics::viewportSize() const
 
 void GAnalytics::setLanguage(const QString &language)
 {
-    d->language = language;
-    emit languageChanged();
+    if (d->language != language)
+    {
+        d->language = language;
+        emit languageChanged();
+    }
 }
 
 QString GAnalytics::language() const
@@ -441,8 +492,11 @@ QString GAnalytics::language() const
 
 void GAnalytics::setTrackingID(const QString &trackingID)
 {
-    d->trackingID = trackingID;
-    emit trackingIDChanged();
+    if (d->trackingID != trackingID)
+    {
+        d->trackingID = trackingID;
+        emit trackingIDChanged();
+    }
 }
 
 QString GAnalytics::trackingID() const
@@ -452,8 +506,11 @@ QString GAnalytics::trackingID() const
 
 void GAnalytics::setSendInterval(int milliseconds)
 {
-    d->timer.setInterval(milliseconds);
-    emit sendIntervalChanged();
+    if (d->timer.interval() != milliseconds)
+    {
+        d->timer.setInterval(milliseconds);
+        emit sendIntervalChanged();
+    }
 }
 
 int GAnalytics::sendInterval() const
@@ -475,7 +532,7 @@ bool GAnalytics::isSending() const
  * @param appVersion
  * @param screenName
  */
-void GAnalytics::sendAppview(const QString screenName)
+void GAnalytics::sendAppview(const QString &screenName)
 {
     QUrlQuery query = d->buildStandardPostQuery("appview");
     if (! screenName.isEmpty())
@@ -497,7 +554,8 @@ void GAnalytics::sendAppview(const QString screenName)
  * @param eventLabel
  * @param eventValue
  */
-void GAnalytics::sendEvent(const QString category, const QString action, const QString label, const QVariant value)
+void GAnalytics::sendEvent(const QString &category, const QString &action,
+                           const QString &label, const QVariant &value)
 {
     QUrlQuery query = d->buildStandardPostQuery("event");
     query.addQueryItem("an", d->appName);
@@ -521,7 +579,7 @@ void GAnalytics::sendEvent(const QString category, const QString action, const Q
  * @param exceptionDescription
  * @param exceptionFatal
  */
-void GAnalytics::sendException(const QString &exceptionDescription, const bool exceptionFatal)
+void GAnalytics::sendException(const QString &exceptionDescription, bool exceptionFatal)
 {
     QUrlQuery query = d->buildStandardPostQuery("exception");
     query.addQueryItem("exd", exceptionDescription);
@@ -571,20 +629,24 @@ void GAnalytics::Private::postMessage()
     {
         setIsSending(true);
     }
+
     QString connection = "close";
     if (messageQueue.count() > 1)
     {
         connection = "keep-alive";
     }
+
     QueryBuffer buffer = messageQueue.head();
     QDateTime sendTime = QDateTime::currentDateTime();
     qint64 timeDiff = buffer.time.msecsTo(sendTime);
+
     if(timeDiff > fourHours)
     {
-        // to old.
+        // too old.
         messageQueue.dequeue();
         emit postMessage();
     }
+
     buffer.postQuery.addQueryItem("qt", QString::number(timeDiff));
     request.setRawHeader("Connection", connection.toUtf8());
     request.setHeader(QNetworkRequest::ContentLengthHeader, buffer.postQuery.toString().length());
@@ -606,11 +668,18 @@ void GAnalytics::Private::postMessageFinished(QNetworkReply *reply)
     int httpStausCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (httpStausCode < 200 || httpStausCode > 299)
     {
+        logMessage(GAnalytics::Error, QString("Error posting message: %s").arg(reply->errorString()));
+
         // An error ocurred.
         setIsSending(false);
         return;
     }
-    QueryBuffer remove = messageQueue.dequeue();
+    else
+    {
+        logMessage(GAnalytics::Debug, "Message sent");
+    }
+
+    messageQueue.dequeue();
     emit postNextMessage();
     reply->deleteLater();
 }

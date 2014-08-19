@@ -7,6 +7,8 @@
 class GAnalytics : public QObject
 {
     Q_OBJECT
+    Q_ENUMS(LogLevel)
+    Q_PROPERTY(LogLevel logLevel READ logLevel WRITE setLogLevel NOTIFY logLevelChanged)
     Q_PROPERTY(QString viewportSize READ viewportSize WRITE setViewportSize NOTIFY viewportSizeChanged)
     Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
     Q_PROPERTY(QString trackingID READ trackingID WRITE setTrackingID NOTIFY trackingIDChanged)
@@ -14,10 +16,21 @@ class GAnalytics : public QObject
     Q_PROPERTY(bool isSending READ isSending NOTIFY statusSendingChanged)
 
 public:
+    explicit GAnalytics(QObject *parent = 0);
     explicit GAnalytics(const QString &trackingID, QObject *parent = 0);
     ~GAnalytics();
 
 public:
+    enum LogLevel
+    {
+        Debug,
+        Info,
+        Error
+    };
+
+    void setLogLevel(LogLevel logLevel);
+    LogLevel logLevel() const;
+
     // Getter and Setters
     void setViewportSize(const QString &viewportSize);
     QString viewportSize() const;
@@ -33,21 +46,23 @@ public:
 
     bool isSending() const;
 
+public slots:
+    void sendAppview(const QString &screenName = QString());
+    void sendEvent(const QString &category = QString(),
+                   const QString &action = QString(),
+                   const QString &label = QString(),
+                   const QVariant &value = QVariant());
+    void sendException(const QString &exceptionDescription, bool exceptionFatal = true);
+    void endSession();
+
+
 signals:
+    void logLevelChanged();
     void viewportSizeChanged();
     void languageChanged();
     void trackingIDChanged();
     void sendIntervalChanged();
     void statusSendingChanged();
-
-public slots:
-    void sendAppview(const QString screenName = QString());
-    void sendEvent(const QString category = QString(),
-                   const QString action = QString(),
-                   const QString label = QString(),
-                   const QVariant value = QVariant());
-    void sendException(const QString &exceptionDescription, const bool exceptionFatal = true);
-    void endSession();
 
 private:
     class Private;
