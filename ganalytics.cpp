@@ -31,6 +31,8 @@ public:
     explicit Private(GAnalytics *parent = 0);
     ~Private();
 
+    GAnalytics *q;
+
     QNetworkAccessManager networkManager;
 
     QQueue<QueryBuffer> messageQueue;
@@ -50,9 +52,6 @@ public:
 
     const static int fourHours = 4 * 60 * 60 * 1000;
     const static QString dateTimeFormat;
-
-private:
-    GAnalytics *q;
 
 public:
     void logMessage(GAnalytics::LogLevel level, const QString &message);
@@ -87,9 +86,9 @@ const QString GAnalytics::Private::dateTimeFormat  = "yyyy,MM,dd-hh:mm::ss:zzz";
 GAnalytics::Private::Private(GAnalytics *parent)
 : QObject(parent)
 , q(parent)
+, request(QUrl("http://www.google-analytics.com/collect"))
 , logLevel(GAnalytics::Error)
 , isSending(false)
-, request(QUrl("http://www.google-analytics.com/collect"))
 {
     clientID = getClientID();
     language = QLocale::system().name().toLower().replace("_", "-");
@@ -406,14 +405,20 @@ void GAnalytics::Private::enqueQueryWithCurrentTime(const QUrlQuery &query)
 void GAnalytics::Private::setIsSending(bool doSend)
 {
     if (doSend)
+    {
         timer.stop();
+    }
     else
+    {
         timer.start();
+    }
 
     isSending = doSend;
 
     if (isSending != doSend)
+    {
         emit q->statusSendingChanged();
+    }
 }
 
 
@@ -532,7 +537,7 @@ bool GAnalytics::isSending() const
  * @param appVersion
  * @param screenName
  */
-void GAnalytics::sendAppview(const QString &screenName)
+void GAnalytics::sendAppView(const QString &screenName)
 {
     QUrlQuery query = d->buildStandardPostQuery("appview");
     if (! screenName.isEmpty())
@@ -560,6 +565,7 @@ void GAnalytics::sendEvent(const QString &category, const QString &action,
     QUrlQuery query = d->buildStandardPostQuery("event");
     query.addQueryItem("an", d->appName);
     query.addQueryItem("av", d->appVersion);
+
     if (! category.isEmpty())
         query.addQueryItem("ec", category);
     if (! action.isEmpty())
@@ -583,6 +589,7 @@ void GAnalytics::sendException(const QString &exceptionDescription, bool excepti
 {
     QUrlQuery query = d->buildStandardPostQuery("exception");
     query.addQueryItem("exd", exceptionDescription);
+
     if (exceptionFatal)
     {
         query.addQueryItem("exf", "1");

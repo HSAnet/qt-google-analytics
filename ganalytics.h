@@ -47,7 +47,7 @@ public:
     bool isSending() const;
 
 public slots:
-    void sendAppview(const QString &screenName = QString());
+    void sendAppView(const QString &screenName = QString());
     void sendEvent(const QString &category = QString(),
                    const QString &action = QString(),
                    const QString &label = QString(),
