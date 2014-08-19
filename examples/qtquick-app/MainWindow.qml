@@ -1,6 +1,8 @@
 import QtQuick 2.0
 import QtQuick.Controls 1.2
 import QtQuick.Layouts 1.1
+import QtQuick.Dialogs 1.1
+import analytics 0.1
 
 ApplicationWindow {
     id: root
@@ -12,17 +14,28 @@ ApplicationWindow {
     minimumHeight: mainLayout.Layout.minimumHeight + 2 * margin
     visible: true
 
+    // TODO: Please change this id to yours
+    property string defaultTrackingId: "UA-53395376-1"
     property int margin: 11
 
     Component.onDestruction: {
         tracker.endSession()
     }
 
+    Tracker {
+        id: tracker
+        logLevel: Tracker.Debug
+        sendInterval: 20*1000
+        viewportSize: qsTr("%1x%2").arg(root.width).arg(root.height)
+        trackingID: defaultTrackingId
+    }
+
     menuBar: MenuBar {
         Menu {
-            title: "File"
+            title: "&File"
             MenuItem {
-                text: "Quit"
+                text: "&Quit"
+                shortcut: "CTRL+Q"
                 onTriggered: Qt.quit()
             }
         }
@@ -46,25 +59,40 @@ ApplicationWindow {
             Layout.fillWidth: true
             title: "General information"
 
-            ColumnLayout {
+            GridLayout {
                 id: rowLayout
                 anchors.fill: parent
                 anchors.margins: margin
+                columns: 2
 
-                Label {
-                    text: qsTr("Tracking ID: %1").arg(tracker.trackingID)
+                Label { text: "Tracking ID" }
+                TextField {
+                    Layout.fillWidth: true
+                    text: tracker.trackingID
+                    onTextChanged: tracker.trackingID = text
                 }
 
-                Label {
-                    text: qsTr("Viewport Size: %1").arg(tracker.viewportSize)
+                Label { text: "Viewport Size" }
+                TextField {
+                    Layout.fillWidth: true
+                    readOnly: true
+                    text: tracker.viewportSize
                 }
 
-                Label {
-                    text: qsTr("Language: %1").arg(tracker.language)
+
+                Label { text: "Language" }
+                TextField {
+                    Layout.fillWidth: true
+                    readOnly: true
+                    text: tracker.language
                 }
 
-                Label {
-                    text: qsTr("Send Interval: %1").arg(tracker.sendInterval)
+
+                Label { text: "Send Interval" }
+                TextField {
+                    Layout.fillWidth: true
+                    readOnly: true
+                    text: tracker.sendInterval
                 }
             }
         }
@@ -95,9 +123,11 @@ ApplicationWindow {
 
                     Button {
                         text: "Change current screen name to:"
+                        onClicked: tracker.sendAppView(screenName.text)
                     }
 
                     TextField {
+                        id: screenName
                         Layout.fillWidth: true
                         text: "MainWindow"
                     }

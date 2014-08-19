@@ -2,18 +2,20 @@
 #include <QQmlApplicationEngine>
 #include <QQuickWindow>
 #include <QQmlContext>
+#include <QtQml>
 
 #include "ganalytics.h"
 
 int main(int argc, char* argv[])
 {
+    QApplication::setApplicationName("QtQuick-App");
+    QApplication::setApplicationVersion("0.1");
+
     QApplication app(argc, argv);
 
-    GAnalytics tracker("1234-45");
+    qmlRegisterType<GAnalytics>("analytics", 0, 1, "Tracker");
 
-    QQmlApplicationEngine engine;
-    engine.rootContext()->setContextProperty("tracker", &tracker);
-    engine.load(QUrl("qrc:/qml/MainWindow.qml"));
+    QQmlApplicationEngine engine(QUrl("qrc:/qml/MainWindow.qml"));
 
     return app.exec();
 }
