@@ -9,13 +9,13 @@ Include ```qt-google-analytics.pri``` in your .pro file.
 ## Using
 Please make sure you have set your application information using ```QApplication::setApplicationName``` and ```QApplication::setApplicationVersion```.
 
-In C++:
+### In C++:
 ```
 GAnalytics tracker("UA-my-id");
 tracker.sendAppView("Main Screen");
 ```
 
-In QtQuick:
+### In QtQuick:
 Register the class on the C++ side using ```qmlRegisterType<GAnalytics>("analytics", 0, 1, "Tracker");```
 ```
 Tracker {
