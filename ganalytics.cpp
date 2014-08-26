@@ -300,7 +300,16 @@ QString GAnalytics::Private::getSystemInfo()
 }
 #endif
 
-#ifdef Q_OS_LINUX
+#if defined(Q_OS_ANDROID)
+#include <QAndroidJniObject>
+
+QString GAnalytics::Private::getSystemInfo()
+{
+    QString release = QAndroidJniObject::getStaticObjectField<jstring>("android/os/Build$VERSION", "RELEASE").toString();
+
+    return QString("Android %1").arg(release);
+}
+#elif defined(Q_OS_LINUX)
 #include <sys/utsname.h>
 
 /**
@@ -539,6 +548,8 @@ bool GAnalytics::isSending() const
  */
 void GAnalytics::sendAppView(const QString &screenName)
 {
+    d->logMessage(Info, QString("AppView: %1").arg(screenName));
+
     QUrlQuery query = d->buildStandardPostQuery("appview");
     if (! screenName.isEmpty())
     {
