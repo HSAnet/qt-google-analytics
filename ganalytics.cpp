@@ -305,9 +305,12 @@ QString GAnalytics::Private::getSystemInfo()
 
 QString GAnalytics::Private::getSystemInfo()
 {
-    QString release = QAndroidJniObject::getStaticObjectField<jstring>("android/os/Build$VERSION", "RELEASE").toString();
-
-    return QString("Android %1").arg(release);
+    return QString("Linux; U; Android %1; %2 %3 Build/%4; %5")
+            .arg(QAndroidJniObject::getStaticObjectField<jstring>("android/os/Build$VERSION", "RELEASE").toString())
+            .arg(QAndroidJniObject::getStaticObjectField<jstring>("android/os/Build", "MANUFACTURER").toString())
+            .arg(QAndroidJniObject::getStaticObjectField<jstring>("android/os/Build", "MODEL").toString())
+            .arg(QAndroidJniObject::getStaticObjectField<jstring>("android/os/Build", "ID").toString())
+            .arg(QAndroidJniObject::getStaticObjectField<jstring>("android/os/Build", "BRAND").toString());
 }
 #elif defined(Q_OS_LINUX)
 #include <sys/utsname.h>
