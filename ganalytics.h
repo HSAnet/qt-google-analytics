@@ -3,10 +3,14 @@
 
 #include <QObject>
 #include <QVariant>
+#include <QNetworkAccessManager>
+#include <QQmlParserStatus>
 
 class GAnalytics : public QObject
+                 , public QQmlParserStatus
 {
     Q_OBJECT
+    Q_INTERFACES(QQmlParserStatus)
     Q_ENUMS(LogLevel)
     Q_PROPERTY(LogLevel logLevel READ logLevel WRITE setLogLevel NOTIFY logLevelChanged)
     Q_PROPERTY(QString viewportSize READ viewportSize WRITE setViewportSize NOTIFY viewportSizeChanged)
@@ -46,6 +50,14 @@ public:
 
     bool isSending() const;
 
+    /// Get or set the network access manager. If none is set, the class creates its own on the first request
+    void setNetworkAccessManager(QNetworkAccessManager *networkAccessManager);
+    QNetworkAccessManager *networkAccessManager() const;
+
+    // QQmlParserStatus interface
+    void classBegin();
+    void componentComplete();
+
 public slots:
     void sendAppView(const QString &screenName = QString());
     void sendEvent(const QString &category = QString(),
@@ -70,7 +82,6 @@ private:
 
     friend QDataStream& operator<<(QDataStream &outStream, const GAnalytics &analytics);
     friend QDataStream& operator>>(QDataStream &inStream, GAnalytics &analytics);
-
 };
 
 QDataStream& operator<<(QDataStream &outStream, const GAnalytics &analytics);

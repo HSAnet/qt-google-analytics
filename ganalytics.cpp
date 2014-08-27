@@ -12,6 +12,8 @@
 #include <QUrlQuery>
 #include <QDateTime>
 #include <QNetworkReply>
+#include <QQmlEngine>
+#include <QQmlContext>
 
 
 struct QueryBuffer
@@ -33,7 +35,7 @@ public:
 
     GAnalytics *q;
 
-    QNetworkAccessManager networkManager;
+    QNetworkAccessManager *networkManager;
 
     QQueue<QueryBuffer> messageQueue;
     QTimer timer;
@@ -73,7 +75,7 @@ signals:
 
 public slots:
     void postMessage();
-    void postMessageFinished(QNetworkReply *reply);
+    void postMessageFinished();
 };
 
 const QString GAnalytics::Private::dateTimeFormat  = "yyyy,MM,dd-hh:mm::ss:zzz";
@@ -86,6 +88,7 @@ const QString GAnalytics::Private::dateTimeFormat  = "yyyy,MM,dd-hh:mm::ss:zzz";
 GAnalytics::Private::Private(GAnalytics *parent)
 : QObject(parent)
 , q(parent)
+, networkManager(NULL)
 , request(QUrl("http://www.google-analytics.com/collect"))
 , logLevel(GAnalytics::Error)
 , isSending(false)
@@ -97,7 +100,6 @@ GAnalytics::Private::Private(GAnalytics *parent)
     request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
     appName = qApp->applicationName();
     appVersion = qApp->applicationVersion();
-    connect(&networkManager, SIGNAL(finished(QNetworkReply*)), this, SLOT(postMessageFinished(QNetworkReply*)));
     connect(this, SIGNAL(postNextMessage()), this, SLOT(postMessage()));
     timer.start(30000);
     connect(&timer, SIGNAL(timeout()), this, SLOT(postMessage()));
@@ -114,7 +116,9 @@ GAnalytics::Private::~Private()
 void GAnalytics::Private::logMessage(LogLevel level, const QString &message)
 {
     if (logLevel > level)
+    {
         return;
+    }
 
     qDebug() << "[Analytics]" << message;
 }
@@ -540,6 +544,25 @@ bool GAnalytics::isSending() const
     return d->isSending;
 }
 
+void GAnalytics::setNetworkAccessManager(QNetworkAccessManager *networkAccessManager)
+{
+    if (d->networkManager != networkAccessManager)
+    {
+        // Delete the old network manager if it was our child
+        if (d->networkManager && d->networkManager->parent() == this)
+        {
+            d->networkManager->deleteLater();
+        }
+
+        d->networkManager = networkAccessManager;
+    }
+}
+
+QNetworkAccessManager *GAnalytics::networkAccessManager() const
+{
+    return d->networkManager;
+}
+
 /**
  * SentAppview is called when the user changed the applications view.
  * These action of the user should be noticed and reported. Therefore
@@ -671,7 +694,15 @@ void GAnalytics::Private::postMessage()
     buffer.postQuery.addQueryItem("qt", QString::number(timeDiff));
     request.setRawHeader("Connection", connection.toUtf8());
     request.setHeader(QNetworkRequest::ContentLengthHeader, buffer.postQuery.toString().length());
-    networkManager.post(request, buffer.postQuery.query(QUrl::EncodeUnicode).toUtf8());
+
+    // Create a new network access manager if we don't have one yet
+    if (networkManager == NULL)
+    {
+        networkManager = new QNetworkAccessManager(this);
+    }
+
+    QNetworkReply *reply = networkManager->post(request, buffer.postQuery.query(QUrl::EncodeUnicode).toUtf8());
+    connect(reply, SIGNAL(finished()), this, SLOT(postMessageFinished()));
 }
 
 /**
@@ -682,10 +713,11 @@ void GAnalytics::Private::postMessage()
  * if there is any.
  * If message couldn't be send then next try is when the
  * timer emits its signal.
- * @param replay    Replay to the http POST.
  */
-void GAnalytics::Private::postMessageFinished(QNetworkReply *reply)
+void GAnalytics::Private::postMessageFinished()
 {
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+
     int httpStausCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (httpStausCode < 200 || httpStausCode > 299)
     {
@@ -733,6 +765,21 @@ QDataStream &operator >>(QDataStream &inStream, GAnalytics &analytics)
     analytics.d->readMessagesFromFile(dataList);
 
     return inStream;
+}
+
+void GAnalytics::classBegin()
+{
+    // Get the network access manager from the QmlEngine
+    QQmlContext *context = QQmlEngine::contextForObject(this);
+    if (context)
+    {
+        QQmlEngine *engine = context->engine();
+        setNetworkAccessManager(engine->networkAccessManager());
+    }
+}
+
+void GAnalytics::componentComplete()
+{
 }
 
 #include "ganalytics.moc"
