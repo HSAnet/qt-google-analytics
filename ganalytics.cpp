@@ -14,6 +14,7 @@
 #include <QNetworkReply>
 #include <QQmlEngine>
 #include <QQmlContext>
+#include <QDebug>
 
 
 struct QueryBuffer
