@@ -430,9 +430,11 @@ void GAnalytics::Private::setIsSending(bool doSend)
         timer.start();
     }
 
+    bool changed = (isSending != doSend);
+
     isSending = doSend;
 
-    if (isSending != doSend)
+    if (changed)
     {
         emit q->statusSendingChanged();
     }
