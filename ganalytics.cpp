@@ -436,7 +436,7 @@ void GAnalytics::Private::setIsSending(bool doSend)
 
     if (changed)
     {
-        emit q->statusSendingChanged();
+        emit q->isSendingChanged(isSending);
     }
 }
 

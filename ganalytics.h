@@ -17,7 +17,7 @@ class GAnalytics : public QObject
     Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
     Q_PROPERTY(QString trackingID READ trackingID WRITE setTrackingID NOTIFY trackingIDChanged)
     Q_PROPERTY(int sendInterval READ sendInterval WRITE setSendInterval NOTIFY sendIntervalChanged)
-    Q_PROPERTY(bool isSending READ isSending NOTIFY statusSendingChanged)
+    Q_PROPERTY(bool isSending READ isSending NOTIFY isSendingChanged)
 
 public:
     explicit GAnalytics(QObject *parent = 0);
@@ -74,7 +74,7 @@ signals:
     void languageChanged();
     void trackingIDChanged();
     void sendIntervalChanged();
-    void statusSendingChanged();
+    void isSendingChanged(bool isSending);
 
 private:
     class Private;
