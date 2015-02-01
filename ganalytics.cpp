@@ -2,20 +2,26 @@
 
 #include <QQueue>
 #include <QTimer>
-#include <QScreen>
-#include <QGuiApplication>
 #include <QSettings>
 #include <QUuid>
+#include <QCoreApplication>
 #include <QStandardPaths>
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
 #include <QUrlQuery>
 #include <QDateTime>
 #include <QNetworkReply>
-#include <QQmlEngine>
-#include <QQmlContext>
 #include <QDebug>
 
+#ifdef QT_GUI_LIB
+#include <QScreen>
+#include <QGuiApplication>
+#endif // QT_GUI_LIB
+
+#ifdef QT_QML_LIB
+#include <QQmlEngine>
+#include <QQmlContext>
+#endif // QT_QML_LIB
 
 struct QueryBuffer
 {
@@ -30,6 +36,7 @@ struct QueryBuffer
 class GAnalytics::Private : public QObject
 {
     Q_OBJECT
+
 public:
     explicit Private(GAnalytics *parent = 0);
     ~Private();
@@ -96,11 +103,13 @@ GAnalytics::Private::Private(GAnalytics *parent)
 {
     clientID = getClientID();
     language = QLocale::system().name().toLower().replace("_", "-");
+#ifdef QT_GUI_LIB
     screenResolution = getScreenResolution();
+#endif // QT_GUI_LIB
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
     request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
-    appName = qApp->applicationName();
-    appVersion = qApp->applicationVersion();
+    appName = QCoreApplication::instance()->applicationName();
+    appVersion = QCoreApplication::instance()->applicationVersion();
     connect(this, SIGNAL(postNextMessage()), this, SLOT(postMessage()));
     timer.start(30000);
     connect(&timer, SIGNAL(timeout()), this, SLOT(postMessage()));
@@ -770,6 +779,7 @@ QDataStream &operator >>(QDataStream &inStream, GAnalytics &analytics)
     return inStream;
 }
 
+#ifdef QT_QML_LIB
 void GAnalytics::classBegin()
 {
     // Get the network access manager from the QmlEngine
@@ -784,5 +794,6 @@ void GAnalytics::classBegin()
 void GAnalytics::componentComplete()
 {
 }
+#endif // QT_QML_LIB
 
 #include "ganalytics.moc"

@@ -4,13 +4,20 @@
 #include <QObject>
 #include <QVariant>
 #include <QNetworkAccessManager>
+
+#ifdef QT_QML_LIB
 #include <QQmlParserStatus>
+#endif // QT_QML_LIB
 
 class GAnalytics : public QObject
+#ifdef QT_QML_LIB
                  , public QQmlParserStatus
+#endif // QT_QML_LIB
 {
     Q_OBJECT
+#ifdef QT_QML_LIB
     Q_INTERFACES(QQmlParserStatus)
+#endif // QT_QML_LIB
     Q_ENUMS(LogLevel)
     Q_PROPERTY(LogLevel logLevel READ logLevel WRITE setLogLevel NOTIFY logLevelChanged)
     Q_PROPERTY(QString viewportSize READ viewportSize WRITE setViewportSize NOTIFY viewportSizeChanged)
@@ -54,9 +61,11 @@ public:
     void setNetworkAccessManager(QNetworkAccessManager *networkAccessManager);
     QNetworkAccessManager *networkAccessManager() const;
 
+#ifdef QT_QML_LIB
     // QQmlParserStatus interface
     void classBegin();
     void componentComplete();
+#endif // QT_QML_LIB
 
 public slots:
     void sendAppView(const QString &screenName = QString());
