@@ -19,6 +19,7 @@ public slots:
 
 int main(int argc, char* argv[])
 {
+    QCoreApplication::setOrganizationName("HSAnet");
     QCoreApplication::setApplicationName("Console-App");
     QCoreApplication::setApplicationVersion("0.1");
 

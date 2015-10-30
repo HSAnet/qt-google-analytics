@@ -1,17 +1,18 @@
 #include "ganalytics.h"
 
-#include <QQueue>
-#include <QTimer>
-#include <QSettings>
-#include <QUuid>
 #include <QCoreApplication>
-#include <QStandardPaths>
-#include <QNetworkAccessManager>
-#include <QNetworkRequest>
-#include <QUrlQuery>
+#include <QDataStream>
 #include <QDateTime>
-#include <QNetworkReply>
 #include <QDebug>
+#include <QLocale>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QQueue>
+#include <QSettings>
+#include <QTimer>
+#include <QUrlQuery>
+#include <QUuid>
 
 #ifdef QT_GUI_LIB
 #include <QScreen>
@@ -107,9 +108,9 @@ GAnalytics::Private::Private(GAnalytics *parent)
     screenResolution = getScreenResolution();
 #endif // QT_GUI_LIB
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
-    request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
     appName = QCoreApplication::instance()->applicationName();
     appVersion = QCoreApplication::instance()->applicationVersion();
+    request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
     connect(this, SIGNAL(postNextMessage()), this, SLOT(postMessage()));
     timer.start(30000);
     connect(&timer, SIGNAL(timeout()), this, SLOT(postMessage()));
@@ -232,6 +233,12 @@ QString GAnalytics::Private::getSystemInfo()
     case QSysInfo::MV_10_9:
         os = "Macintosh; Mac OS 10.9";
         break;
+    case QSysInfo::MV_10_10:
+        os = "Macintosh; Mac OS 10.10";
+        break;
+    case QSysInfo::MV_10_11:
+        os = "Macintosh; Mac OS 10.11";
+        break;
     case QSysInfo::MV_Unknown:
         os = "Macintosh; Mac OS unknown";
         break;
@@ -252,6 +259,24 @@ QString GAnalytics::Private::getSystemInfo()
         break;
     case QSysInfo::MV_IOS_7_1:
         os = "iPhone; iOS 7.1";
+        break;
+    case QSysInfo::MV_IOS_8_0:
+        os = "iPhone; iOS 8.0";
+        break;
+    case QSysInfo::MV_IOS_8_1:
+        os = "iPhone; iOS 8.1";
+        break;
+    case QSysInfo::MV_IOS_8_2:
+        os = "iPhone; iOS 8.2";
+        break;
+    case QSysInfo::MV_IOS_8_3:
+        os = "iPhone; iOS 8.3";
+        break;
+    case QSysInfo::MV_IOS_8_4:
+        os = "iPhone; iOS 8.4";
+        break;
+    case QSysInfo::MV_IOS_9_0:
+        os = "iPhone; iOS 9.0";
         break;
     case QSysInfo::MV_IOS:
         os = "iPhone; iOS unknown";
@@ -305,6 +330,9 @@ QString GAnalytics::Private::getSystemInfo()
         break;
     case QSysInfo::WV_WINDOWS8_1:
         os += "Win 8.1";
+        break;
+      case QSysInfo::WV_WINDOWS10:
+        os += "Win 10";
         break;
     default:
         os = "Windows; unknown";
@@ -551,6 +579,12 @@ int GAnalytics::sendInterval() const
     return (d->timer.interval());
 }
 
+void GAnalytics::startSending()
+{
+    if (!isSending())
+      emit d->postNextMessage();
+}
+
 bool GAnalytics::isSending() const
 {
     return d->isSending;
@@ -575,6 +609,12 @@ QNetworkAccessManager *GAnalytics::networkAccessManager() const
     return d->networkManager;
 }
 
+static void appendCustomValues(QUrlQuery &query, const QVariantMap &customValues) {
+  for(QVariantMap::const_iterator iter = customValues.begin(); iter != customValues.end(); ++iter) {
+    query.addQueryItem(iter.key(), iter.value().toString());
+  }
+}
+
 /**
  * SentAppview is called when the user changed the applications view.
  * These action of the user should be noticed and reported. Therefore
@@ -584,7 +624,8 @@ QNetworkAccessManager *GAnalytics::networkAccessManager() const
  * @param appVersion
  * @param screenName
  */
-void GAnalytics::sendAppView(const QString &screenName)
+void GAnalytics::sendAppView(const QString &screenName,
+                             const QVariantMap &customValues)
 {
     d->logMessage(Info, QString("AppView: %1").arg(screenName));
 
@@ -595,6 +636,7 @@ void GAnalytics::sendAppView(const QString &screenName)
     }
     query.addQueryItem("an", d->appName);
     query.addQueryItem("av", d->appVersion);
+    appendCustomValues(query, customValues);
 
     d->enqueQueryWithCurrentTime(query);
 }
@@ -609,7 +651,8 @@ void GAnalytics::sendAppView(const QString &screenName)
  * @param eventValue
  */
 void GAnalytics::sendEvent(const QString &category, const QString &action,
-                           const QString &label, const QVariant &value)
+                           const QString &label, const QVariant &value,
+                           const QVariantMap &customValues)
 {
     QUrlQuery query = d->buildStandardPostQuery("event");
     query.addQueryItem("an", d->appName);
@@ -624,6 +667,8 @@ void GAnalytics::sendEvent(const QString &category, const QString &action,
     if (value.isValid())
         query.addQueryItem("ev", value.toString());
 
+    appendCustomValues(query, customValues);
+
     d->enqueQueryWithCurrentTime(query);
 }
 
@@ -634,7 +679,9 @@ void GAnalytics::sendEvent(const QString &category, const QString &action,
  * @param exceptionDescription
  * @param exceptionFatal
  */
-void GAnalytics::sendException(const QString &exceptionDescription, bool exceptionFatal)
+void GAnalytics::sendException(const QString &exceptionDescription,
+                               bool exceptionFatal,
+                               const QVariantMap &customValues)
 {
     QUrlQuery query = d->buildStandardPostQuery("exception");
     query.addQueryItem("exd", exceptionDescription);
@@ -647,6 +694,20 @@ void GAnalytics::sendException(const QString &exceptionDescription, bool excepti
     {
         query.addQueryItem("exf", "0");
     }
+    appendCustomValues(query, customValues);
+
+    d->enqueQueryWithCurrentTime(query);
+}
+
+/**
+ * Session starts. This event will be sent by a POST message.
+ * Query is setup in this method and stored in the message
+ * queue.
+ */
+void GAnalytics::startSession()
+{
+    QUrlQuery query = d->buildStandardPostQuery("event");
+    query.addQueryItem("sc", "start");
 
     d->enqueQueryWithCurrentTime(query);
 }
@@ -700,7 +761,8 @@ void GAnalytics::Private::postMessage()
     {
         // too old.
         messageQueue.dequeue();
-        emit postMessage();
+        emit postNextMessage();
+        return;
     }
 
     buffer.postQuery.addQueryItem("qt", QString::number(timeDiff));

@@ -2,12 +2,13 @@
 #define GANALYTICS_H
 
 #include <QObject>
-#include <QVariant>
-#include <QNetworkAccessManager>
+#include <QVariantMap>
 
 #ifdef QT_QML_LIB
 #include <QQmlParserStatus>
 #endif // QT_QML_LIB
+
+class QNetworkAccessManager;
 
 class GAnalytics : public QObject
 #ifdef QT_QML_LIB
@@ -55,6 +56,7 @@ public:
     void setSendInterval(int milliseconds);
     int sendInterval() const;
 
+    void startSending();
     bool isSending() const;
 
     /// Get or set the network access manager. If none is set, the class creates its own on the first request
@@ -68,12 +70,17 @@ public:
 #endif // QT_QML_LIB
 
 public slots:
-    void sendAppView(const QString &screenName = QString());
+    void sendAppView(const QString &screenName = QString(),
+                     const QVariantMap &customValues = QVariantMap());
     void sendEvent(const QString &category = QString(),
                    const QString &action = QString(),
                    const QString &label = QString(),
-                   const QVariant &value = QVariant());
-    void sendException(const QString &exceptionDescription, bool exceptionFatal = true);
+                   const QVariant &value = QVariant(),
+                   const QVariantMap &customValues = QVariantMap());
+    void sendException(const QString &exceptionDescription,
+                       bool exceptionFatal = true,
+                       const QVariantMap &customValues = QVariantMap());
+    void startSession();
     void endSession();
 
 
