@@ -1,17 +1,18 @@
 #include "ganalytics.h"
 
-#include <QQueue>
-#include <QTimer>
-#include <QSettings>
-#include <QUuid>
 #include <QCoreApplication>
-#include <QStandardPaths>
-#include <QNetworkAccessManager>
-#include <QNetworkRequest>
-#include <QUrlQuery>
+#include <QDataStream>
 #include <QDateTime>
-#include <QNetworkReply>
 #include <QDebug>
+#include <QLocale>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QQueue>
+#include <QSettings>
+#include <QTimer>
+#include <QUrlQuery>
+#include <QUuid>
 
 #ifdef QT_GUI_LIB
 #include <QScreen>
@@ -578,6 +579,12 @@ int GAnalytics::sendInterval() const
     return (d->timer.interval());
 }
 
+void GAnalytics::startSending()
+{
+    if (!isSending())
+      emit d->postNextMessage();
+}
+
 bool GAnalytics::isSending() const
 {
     return d->isSending;
@@ -602,6 +609,12 @@ QNetworkAccessManager *GAnalytics::networkAccessManager() const
     return d->networkManager;
 }
 
+static void appendCustomValues(QUrlQuery &query, const QVariantMap &customValues) {
+  for(QVariantMap::const_iterator iter = customValues.begin(); iter != customValues.end(); ++iter) {
+    query.addQueryItem(iter.key(), iter.value().toString());
+  }
+}
+
 /**
  * SentAppview is called when the user changed the applications view.
  * These action of the user should be noticed and reported. Therefore
@@ -611,7 +624,8 @@ QNetworkAccessManager *GAnalytics::networkAccessManager() const
  * @param appVersion
  * @param screenName
  */
-void GAnalytics::sendAppView(const QString &screenName)
+void GAnalytics::sendAppView(const QString &screenName,
+                             const QVariantMap &customValues)
 {
     d->logMessage(Info, QString("AppView: %1").arg(screenName));
 
@@ -622,6 +636,7 @@ void GAnalytics::sendAppView(const QString &screenName)
     }
     query.addQueryItem("an", d->appName);
     query.addQueryItem("av", d->appVersion);
+    appendCustomValues(query, customValues);
 
     d->enqueQueryWithCurrentTime(query);
 }
@@ -636,7 +651,8 @@ void GAnalytics::sendAppView(const QString &screenName)
  * @param eventValue
  */
 void GAnalytics::sendEvent(const QString &category, const QString &action,
-                           const QString &label, const QVariant &value)
+                           const QString &label, const QVariant &value,
+                           const QVariantMap &customValues)
 {
     QUrlQuery query = d->buildStandardPostQuery("event");
     query.addQueryItem("an", d->appName);
@@ -651,6 +667,8 @@ void GAnalytics::sendEvent(const QString &category, const QString &action,
     if (value.isValid())
         query.addQueryItem("ev", value.toString());
 
+    appendCustomValues(query, customValues);
+
     d->enqueQueryWithCurrentTime(query);
 }
 
@@ -661,7 +679,9 @@ void GAnalytics::sendEvent(const QString &category, const QString &action,
  * @param exceptionDescription
  * @param exceptionFatal
  */
-void GAnalytics::sendException(const QString &exceptionDescription, bool exceptionFatal)
+void GAnalytics::sendException(const QString &exceptionDescription,
+                               bool exceptionFatal,
+                               const QVariantMap &customValues)
 {
     QUrlQuery query = d->buildStandardPostQuery("exception");
     query.addQueryItem("exd", exceptionDescription);
@@ -674,6 +694,20 @@ void GAnalytics::sendException(const QString &exceptionDescription, bool excepti
     {
         query.addQueryItem("exf", "0");
     }
+    appendCustomValues(query, customValues);
+
+    d->enqueQueryWithCurrentTime(query);
+}
+
+/**
+ * Session starts. This event will be sent by a POST message.
+ * Query is setup in this method and stored in the message
+ * queue.
+ */
+void GAnalytics::startSession()
+{
+    QUrlQuery query = d->buildStandardPostQuery("event");
+    query.addQueryItem("sc", "start");
 
     d->enqueQueryWithCurrentTime(query);
 }
