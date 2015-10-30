@@ -107,9 +107,9 @@ GAnalytics::Private::Private(GAnalytics *parent)
     screenResolution = getScreenResolution();
 #endif // QT_GUI_LIB
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
-    request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
     appName = QCoreApplication::instance()->applicationName();
     appVersion = QCoreApplication::instance()->applicationVersion();
+    request.setHeader(QNetworkRequest::UserAgentHeader, getUserAgent());
     connect(this, SIGNAL(postNextMessage()), this, SLOT(postMessage()));
     timer.start(30000);
     connect(&timer, SIGNAL(timeout()), this, SLOT(postMessage()));
@@ -727,7 +727,8 @@ void GAnalytics::Private::postMessage()
     {
         // too old.
         messageQueue.dequeue();
-        emit postMessage();
+        emit postNextMessage();
+        return;
     }
 
     buffer.postQuery.addQueryItem("qt", QString::number(timeDiff));
