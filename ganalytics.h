@@ -70,6 +70,8 @@ public:
 #endif // QT_QML_LIB
 
 public slots:
+    void sendScreenView(const QString &screenName = QString(),
+                        const QVariantMap &customValues = QVariantMap());
     void sendAppView(const QString &screenName = QString(),
                      const QVariantMap &customValues = QVariantMap());
     void sendEvent(const QString &category = QString(),

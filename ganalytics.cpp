@@ -53,6 +53,7 @@ public:
 
     QString trackingID;
     QString clientID;
+    QString userID;
     QString appName;
     QString appVersion;
     QString language;
@@ -76,6 +77,8 @@ public:
     QList<QString> persistMessageQueue();
     void readMessagesFromFile(const QList<QString> &dataList);
     QString getClientID();
+    QString getUserID();
+    void setUserID(QString userID);
     void enqueQueryWithCurrentTime(const QUrlQuery &query);
     void setIsSending(bool doSend);
 
@@ -103,6 +106,7 @@ GAnalytics::Private::Private(GAnalytics *parent)
 , isSending(false)
 {
     clientID = getClientID();
+    userID = getUserID();
     language = QLocale::system().name().toLower().replace("_", "-");
 #ifdef QT_GUI_LIB
     screenResolution = getScreenResolution();
@@ -146,6 +150,10 @@ QUrlQuery GAnalytics::Private::buildStandardPostQuery(const QString &type)
     query.addQueryItem("v", "1");
     query.addQueryItem("tid", trackingID);
     query.addQueryItem("cid", clientID);
+    if(!userID.isEmpty())
+    {
+        query.addQueryItem("uid", userID);
+    }
     query.addQueryItem("t", type);
     query.addQueryItem("ul", language);
 
@@ -416,6 +424,27 @@ void GAnalytics::Private::readMessagesFromFile(const QList<QString> &dataList)
 }
 
 /**
+ * Change the user id.
+ * @param userID         A string with the user id.
+ */
+void GAnalytics::Private::setUserID(QString userID)
+{
+    this->userID = userID;
+    QSettings settings;
+    settings.setValue("GAnalytics-uid", userID);
+}
+
+/**
+ * Get the user id.
+ * User id once created is stored in application settings.
+ * @return userID         A string with the user id.
+ */
+QString GAnalytics::Private::getUserID()
+{
+    return userID;
+}
+
+/**
  * Get the client id.
  * Client id once created is stored in application settings.
  * @return clientID         A string with the client id.
@@ -615,8 +644,23 @@ static void appendCustomValues(QUrlQuery &query, const QVariantMap &customValues
   }
 }
 
+
 /**
- * SentAppview is called when the user changed the applications view.
+* SentAppview is called when the user changed the applications view.
+* Deprecated because after SDK Version 3.08 and up no more "appview" event:
+* Use sendScreenView() instead
+* @param appName
+* @param appVersion
+* @param screenName
+*/
+void GAnalytics::sendAppView(const QString &screenName,
+                             const QVariantMap &customValues)
+{
+    sendScreenView(screenName, customValues);
+}
+
+/**
+ * Sent screen view is called when the user changed the applications view.
  * These action of the user should be noticed and reported. Therefore
  * a QUrlQuery is build in this method. It holts all the parameter for
  * a http POST. The UrlQuery will be stored in a message Queue.
@@ -624,12 +668,12 @@ static void appendCustomValues(QUrlQuery &query, const QVariantMap &customValues
  * @param appVersion
  * @param screenName
  */
-void GAnalytics::sendAppView(const QString &screenName,
+void GAnalytics::sendScreenView(const QString &screenName,
                              const QVariantMap &customValues)
 {
-    d->logMessage(Info, QString("AppView: %1").arg(screenName));
+    d->logMessage(Info, QString("ScreenView: %1").arg(screenName));
 
-    QUrlQuery query = d->buildStandardPostQuery("appview");
+    QUrlQuery query = d->buildStandardPostQuery("screenview");
     if (! screenName.isEmpty())
     {
         query.addQueryItem("cd", screenName);
