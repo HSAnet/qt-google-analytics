@@ -78,7 +78,7 @@ public:
     void readMessagesFromFile(const QList<QString> &dataList);
     QString getClientID();
     QString getUserID();
-    void setUserID(QString userID);
+    void setUserID(const QString &userID);
     void enqueQueryWithCurrentTime(const QUrlQuery &query);
     void setIsSending(bool doSend);
 
@@ -427,7 +427,7 @@ void GAnalytics::Private::readMessagesFromFile(const QList<QString> &dataList)
  * Change the user id.
  * @param userID         A string with the user id.
  */
-void GAnalytics::Private::setUserID(QString userID)
+void GAnalytics::Private::setUserID(const QString &userID)
 {
     this->userID = userID;
     QSettings settings;
@@ -440,7 +440,10 @@ void GAnalytics::Private::setUserID(QString userID)
  * @return userID         A string with the user id.
  */
 QString GAnalytics::Private::getUserID()
-{
+{    
+    QSettings settings;
+    QString userID = settings.value("GAnalytics-uid", QString("")).toString();
+
     return userID;
 }
 
