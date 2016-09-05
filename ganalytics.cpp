@@ -247,6 +247,9 @@ QString GAnalytics::Private::getSystemInfo()
     case QSysInfo::MV_10_11:
         os = "Macintosh; Mac OS 10.11";
         break;
+    case QSysInfo::MV_10_12:
+        os = "Macintosh; Mac OS 10.12";
+        break;
     case QSysInfo::MV_Unknown:
         os = "Macintosh; Mac OS unknown";
         break;
