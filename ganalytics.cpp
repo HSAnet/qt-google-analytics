@@ -291,6 +291,20 @@ QString GAnalytics::Private::getSystemInfo()
     case QSysInfo::MV_IOS_9_0:
         os = "iPhone; iOS 9.0";
         break;
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 8, 0))
+    case QSysInfo::MV_IOS_9_1:
+        os = "iPhone; iOS 9.1";
+        break;
+    case QSysInfo::MV_IOS_9_2:
+        os = "iPhone; iOS 9.2";
+        break;
+    case QSysInfo::MV_IOS_9_3:
+        os = "iPhone; iOS 9.3";
+        break;
+    case QSysInfo::MV_IOS_10_0:
+        os = "iPhone; iOS 10.0";
+        break;
+#endif
     case QSysInfo::MV_IOS:
         os = "iPhone; iOS unknown";
         break;
