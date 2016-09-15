@@ -123,7 +123,7 @@ ApplicationWindow {
 
                     Button {
                         text: "Change current screen name to:"
-                        onClicked: tracker.sendAppView(screenName.text)
+                        onClicked: tracker.sendScreenView(screenName.text)
                     }
 
                     TextField {
