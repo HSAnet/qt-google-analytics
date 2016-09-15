@@ -750,6 +750,9 @@ void GAnalytics::sendException(const QString &exceptionDescription,
                                const QVariantMap &customValues)
 {
     QUrlQuery query = d->buildStandardPostQuery("exception");
+    query.addQueryItem("an", d->appName);
+    query.addQueryItem("av", d->appVersion);
+
     query.addQueryItem("exd", exceptionDescription);
 
     if (exceptionFatal)
