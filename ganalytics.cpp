@@ -775,10 +775,9 @@ void GAnalytics::sendException(const QString &exceptionDescription,
  */
 void GAnalytics::startSession()
 {
-    QUrlQuery query = d->buildStandardPostQuery("event");
-    query.addQueryItem("sc", "start");
-
-    d->enqueQueryWithCurrentTime(query);
+	QVariantMap customValues;
+	customValues.insert("sc", "start");
+	sendEvent("Session", "Start", QString(), QVariant(), customValues);
 }
 
 /**
@@ -788,10 +787,9 @@ void GAnalytics::startSession()
  */
 void GAnalytics::endSession()
 {
-    QUrlQuery query = d->buildStandardPostQuery("event");
-    query.addQueryItem("sc", "end");
-
-    d->enqueQueryWithCurrentTime(query);
+	QVariantMap customValues;
+	customValues.insert("sc", "end");
+	sendEvent("Session", "End", QString(), QVariant(), customValues);
 }
 
 /**
