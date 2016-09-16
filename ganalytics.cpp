@@ -691,15 +691,12 @@ void GAnalytics::sendAppView(const QString &screenName,
  * @param screenName
  */
 void GAnalytics::sendScreenView(const QString &screenName,
-                             const QVariantMap &customValues)
+                                const QVariantMap &customValues)
 {
     d->logMessage(Info, QString("ScreenView: %1").arg(screenName));
 
     QUrlQuery query = d->buildStandardPostQuery("screenview");
-    if (! screenName.isEmpty())
-    {
-        query.addQueryItem("cd", screenName);
-    }
+    query.addQueryItem("cd", screenName);
     query.addQueryItem("an", d->appName);
     query.addQueryItem("av", d->appVersion);
     appendCustomValues(query, customValues);
@@ -723,11 +720,8 @@ void GAnalytics::sendEvent(const QString &category, const QString &action,
     QUrlQuery query = d->buildStandardPostQuery("event");
     query.addQueryItem("an", d->appName);
     query.addQueryItem("av", d->appVersion);
-
-    if (! category.isEmpty())
-        query.addQueryItem("ec", category);
-    if (! action.isEmpty())
-        query.addQueryItem("ea", action);
+    query.addQueryItem("ec", category);
+    query.addQueryItem("ea", action);
     if (! label.isEmpty())
         query.addQueryItem("el", label);
     if (value.isValid())

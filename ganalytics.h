@@ -70,12 +70,12 @@ public:
 #endif // QT_QML_LIB
 
 public slots:
-    void sendScreenView(const QString &screenName = QString(),
+    void sendScreenView(const QString &screenName,
                         const QVariantMap &customValues = QVariantMap());
-    void sendAppView(const QString &screenName = QString(),
+    void sendAppView(const QString &screenName,
                      const QVariantMap &customValues = QVariantMap());
-    void sendEvent(const QString &category = QString(),
-                   const QString &action = QString(),
+    void sendEvent(const QString &category,
+                   const QString &action,
                    const QString &label = QString(),
                    const QVariant &value = QVariant(),
                    const QVariantMap &customValues = QVariantMap());
