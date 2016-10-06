@@ -431,7 +431,11 @@ void GAnalytics::Private::readMessagesFromFile(const QList<QString> &dataList)
     while (iter.hasNext())
     {
         QString queryString = iter.next();
+        if(!iter.hasNext())
+            break;
         QString dateString = iter.next();
+        if(queryString.isEmpty() || dateString.isEmpty())
+            break;
         QUrlQuery query;
         query.setQuery(queryString);
         QDateTime dateTime = QDateTime::fromString(dateString, dateTimeFormat);
@@ -828,7 +832,9 @@ void GAnalytics::Private::postMessage()
 
     buffer.postQuery.addQueryItem("qt", QString::number(timeDiff));
     request.setRawHeader("Connection", connection.toUtf8());
-    request.setHeader(QNetworkRequest::ContentLengthHeader, buffer.postQuery.toString().length());
+    QByteArray ba;
+    ba = buffer.postQuery.query(QUrl::FullyEncoded).toUtf8();
+    request.setHeader(QNetworkRequest::ContentLengthHeader, ba.length());
 
     // Create a new network access manager if we don't have one yet
     if (networkManager == NULL)
@@ -836,7 +842,7 @@ void GAnalytics::Private::postMessage()
         networkManager = new QNetworkAccessManager(this);
     }
 
-    QNetworkReply *reply = networkManager->post(request, buffer.postQuery.query(QUrl::EncodeUnicode).toUtf8());
+    QNetworkReply *reply = networkManager->post(request, ba);
     connect(reply, SIGNAL(finished()), this, SLOT(postMessageFinished()));
 }
 
