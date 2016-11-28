@@ -37,7 +37,8 @@ public:
     {
         Debug,
         Info,
-        Error
+        Error,
+        None
     };
 
     void setLogLevel(LogLevel logLevel);
