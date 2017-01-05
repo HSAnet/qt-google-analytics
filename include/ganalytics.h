@@ -15,6 +15,11 @@ class GAnalytics : public QObject
 {
 	Q_OBJECT
 	Q_ENUMS(LogLevel)
+    Q_PROPERTY(QString trackingID READ trackingID WRITE setTrackingID)
+    Q_PROPERTY(QString clientID READ clientID WRITE setClientID)
+    Q_PROPERTY(QString viewportSize READ viewportSize WRITE setViewportSize)
+    Q_PROPERTY(int sendInterval READ sendInterval WRITE setSendInterval)
+    Q_PROPERTY(LogLevel logLevel READ logLevel WRITE setLogLevel)
 
 public:
 	explicit GAnalytics(QObject *parent = 0);
