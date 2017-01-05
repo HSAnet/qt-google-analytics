@@ -1,5 +1,4 @@
 #include "ganalytics.h"
-#include "ganalytics_worker.h"
 
 #include <QDataStream>
 #include <QDebug>
@@ -13,12 +12,14 @@
 #include <QUrlQuery>
 #include <QUuid>
 
-GAnalytics::GAnalytics(const QString &trackingID, const QString &clientID, QObject *parent) : QObject(parent)
-{
+GAnalytics::GAnalytics(QObject *parent) : QObject(parent) {
 	d = new GAnalyticsWorker(this);
+}
+
+GAnalytics::GAnalytics(const QString &trackingID, const QString &clientID, QObject *parent) : GAnalytics(parent)
+{
 	d->m_trackingID = trackingID;
 	d->m_clientID = clientID;
-	d->m_version = 1;
 }
 
 /**
@@ -27,6 +28,22 @@ GAnalytics::GAnalytics(const QString &trackingID, const QString &clientID, QObje
 GAnalytics::~GAnalytics()
 {
 	delete d;
+}
+
+void GAnalytics::setTrackingID(const QString &trackingID) {
+	d->m_trackingID = trackingID;
+}
+
+QString GAnalytics::trackingID() const {
+	return d->m_trackingID;
+}
+
+void GAnalytics::setClientID(const QString &clientID) {
+	d->m_clientID = clientID;
+}
+
+QString GAnalytics::clientID() const {
+	return d->m_clientID;
 }
 
 void GAnalytics::setLogLevel(GAnalytics::LogLevel logLevel)
@@ -88,11 +105,6 @@ bool GAnalytics::isEnabled()
 void GAnalytics::enable(bool state)
 {
 	d->enable(state);
-}
-
-int GAnalytics::version()
-{
-	return d->m_version;
 }
 
 void GAnalytics::setNetworkAccessManager(QNetworkAccessManager *networkAccessManager)

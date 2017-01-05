@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.3)
+
 project(ganalytics)
 
 find_package(Qt5Core)
@@ -7,7 +9,6 @@ find_package(Qt5Network)
 set(ganalytics_SOURCES
 src/ganalytics.cpp
 src/ganalytics_worker.cpp
-src/ganalytics_worker.h
 include/ganalytics.h
 )
 

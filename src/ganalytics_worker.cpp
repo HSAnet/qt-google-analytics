@@ -1,5 +1,4 @@
 #include "ganalytics.h"
-#include "ganalytics_worker.h"
 
 #include <QCoreApplication>
 #include <QNetworkAccessManager>
