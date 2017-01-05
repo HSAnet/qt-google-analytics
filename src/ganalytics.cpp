@@ -1,6 +1,5 @@
 #include "ganalytics.h"
 #include "ganalytics_worker.h"
-#include "sys.h"
 
 #include <QDataStream>
 #include <QDebug>
