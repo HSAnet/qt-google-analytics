@@ -5,8 +5,10 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 
+#ifdef QT_GUI_LIB
 #include <QGuiApplication>
 #include <QScreen>
+#endif
 
 const QLatin1String GAnalyticsWorker::dateTimeFormat("yyyy,MM,dd-hh:mm::ss:zzz");
 
@@ -90,10 +92,14 @@ QUrlQuery GAnalyticsWorker::buildStandardPostQuery(const QString &type)
  */
 QString GAnalyticsWorker::getScreenResolution()
 {
-	QScreen *screen = QGuiApplication::primaryScreen();
-	QSize size = screen->size();
+#ifdef QT_GUI_LIB
+    QScreen *screen = QGuiApplication::primaryScreen();
+    QSize size = screen->size();
 
-	return QString("%1x%2").arg(size.width()).arg(size.height());
+    return QString("%1x%2").arg(size.width()).arg(size.height());
+#else
+    return "";
+#endif
 }
 
 /**
