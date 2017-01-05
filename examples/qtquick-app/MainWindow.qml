@@ -16,6 +16,7 @@ ApplicationWindow {
 
     // TODO: Please change this id to yours
     property string defaultTrackingId: "UA-53395376-1"
+    property string defaultClientId: "1"
     property int margin: 11
 
     Component.onDestruction: {
@@ -28,6 +29,7 @@ ApplicationWindow {
         sendInterval: 20*1000
         viewportSize: qsTr("%1x%2").arg(root.width).arg(root.height)
         trackingID: defaultTrackingId
+        clientID: defaultClientId
     }
 
     menuBar: MenuBar {

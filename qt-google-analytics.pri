@@ -1,3 +1,3 @@
-INCLUDEPATH += $$PWD
-HEADERS += $$PWD/ganalytics.h
-SOURCES += $$PWD/ganalytics.cpp
+INCLUDEPATH += $$PWD/include
+HEADERS += $$PWD/include/ganalytics.h
+SOURCES += $$PWD/src/*
