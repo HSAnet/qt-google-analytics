@@ -1,3 +1,2 @@
-build-*
-*.pro.*
-
+.idea
+cmake-build-debug
