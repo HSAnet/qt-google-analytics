@@ -26,7 +26,7 @@ int main(int argc, char* argv[])
     QCoreApplication app(argc, argv);
 
     // Create the tracker
-    GAnalytics tracker("UA-53395376-1");
+    GAnalytics tracker("UA-53395376-1", "1");
 
     Watcher watcher;
     QObject::connect(&tracker, SIGNAL(isSendingChanged(bool)), &watcher, SLOT(onIsSendingChanged(bool)));
