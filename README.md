@@ -30,5 +30,5 @@ tracker.sendScreenView("Main Screen")
 There is also an example application in the examples folder.
 
 ## License
-Copyright (c) 2014-2016, University of Applied Sciences Augsburg.
+Copyright (c) 2014-2017, University of Applied Sciences Augsburg.
 All rights reserved. Distributed under the terms and conditions of the BSD License. See separate LICENSE.txt.
