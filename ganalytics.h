@@ -24,6 +24,7 @@ class GAnalytics : public QObject
     Q_PROPERTY(QString viewportSize READ viewportSize WRITE setViewportSize NOTIFY viewportSizeChanged)
     Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
     Q_PROPERTY(QString trackingID READ trackingID WRITE setTrackingID NOTIFY trackingIDChanged)
+    Q_PROPERTY(QString userID READ userID WRITE setUserID NOTIFY userIDChanged)
     Q_PROPERTY(int sendInterval READ sendInterval WRITE setSendInterval NOTIFY sendIntervalChanged)
     Q_PROPERTY(bool isSending READ isSending NOTIFY isSendingChanged)
 
@@ -53,6 +54,9 @@ public:
 
     void setTrackingID(const QString &trackingID);
     QString trackingID() const;
+
+    void setUserID(const QString &userID);
+    QString userID() const;
 
     void setSendInterval(int milliseconds);
     int sendInterval() const;
@@ -92,6 +96,7 @@ signals:
     void viewportSizeChanged();
     void languageChanged();
     void trackingIDChanged();
+    void userIDChanged();
     void sendIntervalChanged();
     void isSendingChanged(bool isSending);
 

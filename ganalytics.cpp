@@ -629,6 +629,20 @@ void GAnalytics::setSendInterval(int milliseconds)
     }
 }
 
+void GAnalytics::setUserID(const QString &userID)
+{
+    if(d->userID != userID)
+    {
+        d->setUserID(userID);
+        emit userIDChanged();
+    }
+}
+
+QString GAnalytics::userID() const
+{
+    return d->getUserID();
+}
+
 int GAnalytics::sendInterval() const
 {
     return (d->timer.interval());
