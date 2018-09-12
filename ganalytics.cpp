@@ -872,6 +872,7 @@ void GAnalytics::Private::postMessage()
 void GAnalytics::Private::postMessageFinished()
 {
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    reply->deleteLater();
 
     int httpStausCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (httpStausCode < 200 || httpStausCode > 299)
@@ -889,7 +890,6 @@ void GAnalytics::Private::postMessageFinished()
 
     messageQueue.dequeue();
     emit postNextMessage();
-    reply->deleteLater();
 }
 
 
