@@ -386,7 +386,7 @@ QString GAnalytics::Private::getSystemInfo()
     QString system(buf.sysname);
     QString release(buf.release);
 
-    os = system + "; " + release);
+    os = system + "; " + release;
 #endif
     return os;
 }
