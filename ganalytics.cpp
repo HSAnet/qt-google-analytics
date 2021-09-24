@@ -24,6 +24,14 @@
 #include <QQmlContext>
 #endif // QT_QML_LIB
 
+#ifdef Q_OS_ANDROID
+#include <QAndroidJniObject>
+#elif defined(Q_OS_LINUX)
+#include <sys/utsname.h>
+#elif (QT_VERSION >= QT_VERSION_CHECK(5, 9, 0))
+#include <QOperatingSystemVersion>
+#endif
+
 struct QueryBuffer
 {
     QUrlQuery postQuery;
@@ -195,17 +203,28 @@ QString GAnalytics::Private::getUserAgent()
     return QString("%1/%2 (%3; %4) GAnalytics/1.0 (Qt/%5)").arg(appName).arg(appVersion).arg(system).arg(locale).arg(QT_VERSION_STR);
 }
 
-
-#ifdef Q_OS_MAC
 /**
- * Only on Mac OS X
  * Get the Operating system name and version.
  * @return os   The operating system name and version in a string.
  */
 QString GAnalytics::Private::getSystemInfo()
 {
-    QSysInfo::MacVersion version = QSysInfo::macVersion();
     QString os;
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 9, 0)) and (defined(Q_OS_MAC) or defined(Q_OS_WIN))
+    QOperatingSystemVersion ver = QOperatingSystemVersion::current();
+    os = ver.name();
+    int i = ver.segmentCount();
+    if(i > 0) {
+	    os += QString(" %1").arg(ver.majorVersion());
+    }
+    if(i > 1) {
+	    os += QString(".%1").arg(ver.minorVersion());
+    }
+    if(i > 2) {
+	    os += QString(".%1").arg(ver.microVersion());
+    }
+#elif defined(Q_OS_MAC)
+    QSysInfo::MacVersion version = QSysInfo::macVersion();
     switch (version)
     {
     case QSysInfo::MV_9:
@@ -312,20 +331,9 @@ QString GAnalytics::Private::getSystemInfo()
         os = "Macintosh";
         break;
     }
-    return os;
-}
-#endif
-
-#ifdef Q_OS_WIN
-/**
- * Only on Windows
- * Get operating system and its version.
- * @return os   A QString containing the oprating systems name and version.
- */
-QString GAnalytics::Private::getSystemInfo()
-{
+#elif defined(Q_OS_WIN)
     QSysInfo::WinVersion version = QSysInfo::windowsVersion();
-    QString os("Windows; ");
+    os = "Windows; ";
     switch (version)
     {
     case QSysInfo::WV_95:
@@ -365,41 +373,23 @@ QString GAnalytics::Private::getSystemInfo()
         os = "Windows; unknown";
         break;
     }
-    return os;
-}
-#endif
-
-#if defined(Q_OS_ANDROID)
-#include <QAndroidJniObject>
-
-QString GAnalytics::Private::getSystemInfo()
-{
-    return QString("Linux; U; Android %1; %2 %3 Build/%4; %5")
+#elif defined(Q_OS_ANDROID)
+    os = QString("Linux; U; Android %1; %2 %3 Build/%4; %5")
             .arg(QAndroidJniObject::getStaticObjectField<jstring>("android/os/Build$VERSION", "RELEASE").toString())
             .arg(QAndroidJniObject::getStaticObjectField<jstring>("android/os/Build", "MANUFACTURER").toString())
             .arg(QAndroidJniObject::getStaticObjectField<jstring>("android/os/Build", "MODEL").toString())
             .arg(QAndroidJniObject::getStaticObjectField<jstring>("android/os/Build", "ID").toString())
             .arg(QAndroidJniObject::getStaticObjectField<jstring>("android/os/Build", "BRAND").toString());
-}
 #elif defined(Q_OS_LINUX)
-#include <sys/utsname.h>
-
-/**
- * Only on Unix systems.
- * Get operation system name and version.
- * @return os       A QString with the name and version of the operating system.
- */
-QString GAnalytics::Private::getSystemInfo()
-{
     struct utsname buf;
     uname(&buf);
     QString system(buf.sysname);
     QString release(buf.release);
 
-    return system + "; " + release;
-}
+    os = system + "; " + release;
 #endif
-
+    return os;
+}
 
 /**
  * The message queue contains a list of QueryBuffer object.
